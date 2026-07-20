@@ -9,8 +9,8 @@ export async function updateSession(request: NextRequest) {
   const { data: claimsData } = await supabase.auth.getClaims()
   const claims = claimsData?.claims
   const path = request.nextUrl.pathname
-  if (!claims && path.startsWith('/dashboard')) return NextResponse.redirect(new URL('/', request.url))
-  if (claims && path === '/') return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (!claims && path.startsWith('/dashboard')) return NextResponse.redirect(new URL('/login', request.url))
+  if (claims && (path === '/' || path === '/login' || path === '/cadastro')) return NextResponse.redirect(new URL('/dashboard', request.url))
   return response
 }
 

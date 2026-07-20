@@ -4,8 +4,8 @@ import { FormEvent, useState } from 'react'
 import { ArrowRight, Check, Scissors } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-export function LoginForm() {
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
