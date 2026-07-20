@@ -35,11 +35,44 @@ function buildWhatsAppMessage(name: string) {
   return 'Oi, ' + name.split(' ')[0] + '! Tudo bem? Já faz um tempinho desde seu último corte. Quer reservar um horário?' + callToAction
 }
 export function Dashboard({ userEmail }: { userEmail: string }) {
-  const [clients, setClients] = useState<Client[]>([]); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
+  const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
   async function loadClients() { const { data, error } = await createClient().from('vw_clientes_status').select('id,nome,telefone,data_ultimo_corte,status_calculado').order('data_ultimo_corte', { ascending: true }); if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return } setClients((data ?? []).map(client => ({ id: client.id, name: client.nome, phone: client.telefone, last_cut_at: client.data_ultimo_corte, status_calculado: client.status_calculado, frequency: undefined, birthday: undefined }))) }
   useEffect(() => { void loadClients() }, [])
   const filteredClientes = useMemo(() => { const source = clients.length ? clients : sample; const normalizedSearch = searchTerm.trim().toLowerCase(); return source.filter(client => { const matchesSearch = (client.name + ' ' + client.phone).toLowerCase().includes(normalizedSearch); const matchesFrequency = frequencyFilter === 'todos' || client.frequency === frequencyFilter; return matchesSearch && matchesFrequency }) }, [clients, searchTerm, frequencyFilter])
-  async function importCsv(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const text = await file.text(); const rows = text.split(/\r?\n/).filter(Boolean); const parsed = rows.slice(1).map(row => { const [name, phone, date] = row.split(',').map(v => v.trim().replace(/^"|"$/g, '')); return { name, phone: phone.replace(/\D/g, ''), last_cut_at: date } }).filter(row => row.name && row.phone && row.last_cut_at); if (!parsed.length) return setStatus('Não encontramos linhas válidas no CSV.'); const supabase = createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return setStatus('Sua sessão expirou. Entre novamente.'); const { error } = await supabase.from('clientes').insert(parsed.map(row => ({ nome: row.name, telefone: row.phone, data_ultimo_corte: row.last_cut_at, barbearia_id: user.id }))); if (error) return setStatus('Erro ao importar: ' + error.message); await loadClients(); setStatus(`${countLabel(parsed.length, 'cliente', 'clientes')} ${parsed.length === 1 ? 'importado' : 'importados'} com sucesso.`); event.target.value = '' }
+  async function importCsv(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file || isUploading) return
+    setIsUploading(true)
+    try {
+      const rows = (await file.text()).split(/\r?\n/).filter(Boolean)
+      const parsed = rows.slice(1).map(row => {
+        const [name, phone, date] = row.split(',').map(value => value.trim().replace(/^"|"$/g, ''))
+        return { name, phone: phone.replace(/\D/g, ''), last_cut_at: date }
+      }).filter(row => row.name && row.phone && row.last_cut_at)
+      if (!parsed.length) {
+        setStatus('Não encontramos linhas válidas no CSV.')
+        return
+      }
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setStatus('Sua sessão expirou. Entre novamente.')
+        return
+      }
+      const { error } = await supabase.from('clientes').insert(parsed.map(row => ({ nome: row.name, telefone: row.phone, data_ultimo_corte: row.last_cut_at, barbearia_id: user.id })))
+      if (error) {
+        setStatus('Erro ao importar clientes: ' + error.message)
+        return
+      }
+      await loadClients()
+      setStatus('Clientes importados com sucesso!')
+    } catch (error) {
+      setStatus('Erro ao importar clientes: ' + (error instanceof Error ? error.message : 'falha inesperada'))
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
+    }
+  }
   async function signOut() { await createClient().auth.signOut(); window.location.href = '/' }
   const dashboardClients = clients.length ? clients : sample
   const sumidoCount = dashboardClients.filter(c => getRetentionStatus(c) === 'sumido').length
@@ -47,11 +80,11 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
   const estimatedRecoveries = Math.min(sumidoCount, 2)
   const roiMultiple = estimatedRecoveries === 0 ? 0 : estimatedRecoveries
   return <main className="min-h-screen bg-slate-100"><header className="border-b border-slate-200/80 bg-white shadow-sm"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-10"><div className="flex items-center gap-3 font-semibold"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-white"><Scissors size={17} /></span> BarberGrowth</div><div className="flex items-center gap-4"><span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 sm:block">{userEmail}</span><button onClick={signOut} className="rounded-lg p-2 text-[#78847c] transition hover:bg-[#eef2ed]" title="Sair"><LogOut size={17} /></button></div></div></header>
-    <div className="mx-auto max-w-7xl px-6 py-10 lg:px-10"><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-sm font-medium text-[#1c6b49]">Visão geral</p><h1 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Bom dia, barbeiro.</h1><p className="mt-2 text-[#78847c]">Veja quem está esperando por um novo corte.</p></div><div><input ref={fileRef} type="file" accept=".csv,text/csv" onChange={importCsv} className="hidden" /><button onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700"><FileUp size={17} /> Importar planilha CSV</button></div></div>
+    <div className="mx-auto max-w-7xl px-6 py-10 lg:px-10"><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-sm font-medium text-[#1c6b49]">Visão geral</p><h1 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Bom dia, barbeiro.</h1><p className="mt-2 text-[#78847c]">Veja quem está esperando por um novo corte.</p></div><div><input ref={fileRef} type="file" accept=".csv,text/csv" onChange={importCsv} className="hidden" /><button disabled={isUploading} onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"><FileUp size={17} /> {isUploading ? 'Importando...' : 'Importar planilha CSV'}</button></div></div>
       {status && <div className="mt-6 flex items-center gap-2 rounded-xl border border-[#dce9dd] bg-[#f0f8f0] px-4 py-3 text-sm text-[#276243]"><CheckCircle2 size={17} />{status}</div>}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"><MoneyOnTableCard value={atRisk} sumidoCount={sumidoCount} /><RoiBadge multiple={roiMultiple} recoveries={estimatedRecoveries} /><Stat icon={<Users size={18} />} label="Total de clientes" value={dashboardClients.length} /><Stat icon={<CalendarDays size={18} />} label="Cortes este mês" value={dashboardClients.filter(c => new Date(c.last_cut_at).getMonth() === new Date().getMonth()).length} /></div>
       <BirthdayBanner />
-      <HealthBaseChart />
+      <HealthBaseChart clients={dashboardClients} />
       <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm"><div className="flex flex-col justify-between gap-4 border-b border-[#e8ece7] px-5 py-5 sm:flex-row sm:items-center"><div><h2 className="font-semibold">Sua base de clientes</h2><p className="mt-1 text-sm text-[#89948d]">Clientes há mais de 30 dias aparecem destacados.</p></div><div className="relative"><Search size={16} className="absolute left-3 top-3 text-[#9aa59e]" /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente" className="w-full rounded-lg border border-[#e4e8e2] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#1c6b49] sm:w-56" /></div><select value={frequencyFilter} onChange={event => setFrequencyFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-900"><option value="todos">Todas as frequências</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-600"><tr><th className="px-5 py-4 font-medium">Cliente</th><th className="px-5 py-4 font-medium">Telefone</th><th className="px-5 py-4 font-medium">Último corte</th><th className="px-5 py-4 font-medium">Status</th><th className="px-5 py-4" /></tr></thead><tbody className="divide-y divide-slate-100">{filteredClientes.length ? filteredClientes.map(client => <ClientRow key={client.id} client={client} onSelect={() => setSelectedClient(client)} />) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado com estes filtros.</td></tr>}</tbody></table></div>{!clients.length && <p className="border-t border-slate-100 px-5 py-4 text-xs text-[#89948d]">Exibindo exemplos para você visualizar a tela. Importe sua planilha para começar.</p>}</section>
     </div><ClientDrawer client={selectedClient} onClose={() => setSelectedClient(null)} /></main>
 }
@@ -91,8 +124,16 @@ function BirthdayBanner() {
   return <div className="mb-6 flex flex-row items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 px-4"><div className="flex items-center gap-3"><Cake size={18} className="text-amber-600" /><p className="text-sm font-medium text-slate-700">Cadastre datas de nascimento</p></div><button onClick={copyTemplate} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 transition hover:text-slate-900">{copied ? <CheckCircle2 size={14} /> : <Clipboard size={14} />}{copied ? 'Template copiado' : 'Copiar template de 15% OFF'}</button></div>
 }
 
-function HealthBaseChart() {
-  return <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h3 className="mb-3 text-sm font-semibold text-slate-700">Saúde da Base de Clientes</h3><div className="mb-2 flex h-3 w-full overflow-hidden rounded-full"><div className="w-[50%] bg-emerald-500" /><div className="w-[15%] bg-amber-400" /><div className="w-[35%] bg-rose-500" /></div><div className="flex justify-between text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />50% Retidos</span><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />15% Em Alerta</span><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-rose-500" />35% Em Risco</span></div></div>
+function HealthBaseChart({ clients }: { clients: Client[] }) {
+  const totals = clients.reduce((summary, client) => {
+    summary[getRetentionStatus(client)] += 1
+    return summary
+  }, { em_dia: 0, alerta: 0, sumido: 0 })
+  const total = clients.length || 1
+  const retained = Math.round((totals.em_dia / total) * 100)
+  const alert = Math.round((totals.alerta / total) * 100)
+  const risk = Math.max(0, 100 - retained - alert)
+  return <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h3 className="mb-3 text-sm font-semibold text-slate-700">Sa?de da Base de Clientes</h3><div className="mb-2 flex h-3 w-full overflow-hidden rounded-full"><div className="bg-emerald-500" style={{ width: retained + '%' }} /><div className="bg-amber-400" style={{ width: alert + '%' }} /><div className="bg-rose-500" style={{ width: risk + '%' }} /></div><div className="flex justify-between text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />{retained}% Retidos</span><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />{alert}% Em Alerta</span><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-rose-500" />{risk}% Em Risco</span></div></div>
 }
 
 function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
