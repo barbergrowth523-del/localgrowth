@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --ink: #17201b; --muted: #6f7b74; --cream: #f7f8f5; --line: #e4e8e2; --green: #1c6b49; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--cream); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+button, input { font: inherit; }
+.noise { background-image: radial-gradient(#dce5dd 0.55px, transparent 0.55px); background-size: 7px 7px; }
