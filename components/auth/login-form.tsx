@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { ArrowRight, Check, Scissors } from 'lucide-react'
+import { ArrowRight, Check, Scissors, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
@@ -22,7 +22,7 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
   return <main className="grid min-h-screen bg-slate-950 text-white lg:grid-cols-[1.05fr_.95fr]">
     <section className="relative hidden overflow-hidden bg-slate-950 p-12 lg:flex lg:flex-col lg:justify-between"><div className="absolute left-10 top-10 h-96 w-96 rounded-full bg-emerald-500/10 blur-[100px]" />
       <div className="relative z-10 flex items-center gap-3 font-semibold tracking-tight"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-slate-950"><Scissors size={19} /></span> BarberGrowth</div>
-      <div className="relative z-10 max-w-lg pb-12"><p className="mb-5 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">Relacionamento que mantém a cadeira cheia.</p><h1 className="text-6xl font-semibold leading-[.98] tracking-[-.06em] text-white">Seu cliente não deveria precisar lembrar de você.</h1><p className="mt-7 max-w-md text-lg leading-8 text-slate-400">Organize seus clientes, entenda quem está sumido e transforme uma mensagem em mais um horário marcado.</p></div>
+      <div className="relative z-10 max-w-lg pb-12"><p className="mb-5 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">Relacionamento que mantém a cadeira cheia.</p><h1 className="text-6xl font-semibold leading-[.98] tracking-[-.06em] text-white">Seu cliente não deveria precisar lembrar de você.</h1><p className="mt-7 max-w-md text-lg leading-8 text-slate-400">Organize seus clientes, entenda quem está sumido e transforme uma mensagem em mais um horário marcado.</p><ul className="mt-7 space-y-3 text-sm text-slate-300"><li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Integração instantânea com WhatsApp</li><li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Mapeamento inteligente de evasão</li><li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Retorno sobre investimento imediato</li></ul><div className="mt-12 max-w-sm rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md"><div className="flex gap-1 text-amber-400">{[1, 2, 3, 4, 5].map(star => <Star key={star} size={14} fill="currentColor" />)}</div><p className="mt-4 text-sm italic leading-6 text-slate-300">&quot;O sistema encontrou R$ 850 perdidos na minha base de clientes logo no primeiro dia de uso. O investimento se pagou na mesma hora.&quot;</p><p className="mt-4 text-sm font-semibold text-white">Marcos, Carvalhos Barber Shop</p></div></div>
     </section>
     <section className="flex items-center justify-center bg-slate-950 px-6 py-12"><div className="w-full max-w-[390px]">
       <div className="mb-10 lg:hidden flex items-center gap-3 font-semibold"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-slate-950"><Scissors size={17} /></span> BarberGrowth</div>
