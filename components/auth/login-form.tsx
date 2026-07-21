@@ -20,10 +20,9 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
     window.location.href = '/dashboard'
   }
   return <main className="grid min-h-screen bg-slate-950 text-white lg:grid-cols-[1.05fr_.95fr]">
-    <section className="noise relative hidden overflow-hidden bg-slate-900 p-12 lg:flex lg:flex-col lg:justify-between">
+    <section className="relative hidden overflow-hidden bg-slate-950 p-12 lg:flex lg:flex-col lg:justify-between"><div className="absolute left-10 top-10 h-96 w-96 rounded-full bg-emerald-500/10 blur-[100px]" />
       <div className="relative z-10 flex items-center gap-3 font-semibold tracking-tight"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-slate-950"><Scissors size={19} /></span> BarberGrowth</div>
-      <div className="relative z-10 max-w-lg pb-12"><p className="mb-5 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">Relacionamento que mantém a cadeira cheia.</p><h1 className="text-6xl font-semibold leading-[.98] tracking-[-.06em]">Seu cliente não deveria precisar lembrar de você.</h1><p className="mt-7 max-w-md text-lg leading-8 text-slate-400">Organize seus clientes, entenda quem está sumido e transforme uma mensagem em mais um horário marcado.</p></div>
-      <div className="absolute -bottom-32 -right-20 h-80 w-80 rounded-full border-[48px] border-[#c7dbc9]" />
+      <div className="relative z-10 max-w-lg pb-12"><p className="mb-5 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">Relacionamento que mantém a cadeira cheia.</p><h1 className="text-6xl font-semibold leading-[.98] tracking-[-.06em] text-white">Seu cliente não deveria precisar lembrar de você.</h1><p className="mt-7 max-w-md text-lg leading-8 text-slate-400">Organize seus clientes, entenda quem está sumido e transforme uma mensagem em mais um horário marcado.</p></div>
     </section>
     <section className="flex items-center justify-center bg-slate-950 px-6 py-12"><div className="w-full max-w-[390px]">
       <div className="mb-10 lg:hidden flex items-center gap-3 font-semibold"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-slate-950"><Scissors size={17} /></span> BarberGrowth</div>
