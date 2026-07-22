@@ -38,20 +38,21 @@ export async function GET(request: Request) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ capacity: 1, booked: {} })
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
-  const [{ data: profile, error: profileError }, { data: rows, error: appointmentsError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: barbers, error: barbersError }, { data: rows, error: appointmentsError }] = await Promise.all([
     supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle(),
+    supabase.from('barbeiros').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
     supabase.from('agendamentos').select('hora_agendamento').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('status', 'Confirmado'),
   ])
-  if (profileError || appointmentsError) {
-    console.error('[api/agendar] availability lookup failed', { profileError, appointmentsError, barbeariaId, date })
-    return NextResponse.json({ capacity: 1, booked: {} })
+  if (profileError || barbersError || appointmentsError) {
+    console.error('[api/agendar] availability lookup failed', { profileError, barbersError, appointmentsError, barbeariaId, date })
+    return NextResponse.json({ capacity: 1, booked: {}, barbers: [] })
   }
   const booked: Record<string, number> = {}
   ;(rows ?? []).forEach((row) => {
     const time = String(row.hora_agendamento).slice(0, 5)
     booked[time] = (booked[time] ?? 0) + 1
   })
-  return NextResponse.json({ capacity: profile?.cadeiras_simultaneas ?? 1, booked })
+  return NextResponse.json({ capacity: profile?.cadeiras_simultaneas ?? 1, booked, barbers: barbers ?? [] })
 }
 export async function POST(request: Request) {
   let body: {
@@ -71,6 +72,8 @@ export async function POST(request: Request) {
     time?: string
     hora?: string
     hora_agendamento?: string
+    barbeiroId?: string
+    barbeiro_id?: string
   }
 
   try {
@@ -88,6 +91,7 @@ export async function POST(request: Request) {
   const servicoNome = (body.servico || '').trim()
   const date = (body.date || body.data || body.data_agendamento || '').trim()
   const time = (body.time || body.hora || body.hora_agendamento || '').trim()
+  const requestedBarberId = (body.barbeiroId || body.barbeiro_id || '').trim()
 
   if (!barbeariaId || !uuidPattern.test(barbeariaId)) return errorResponse('Link de agendamento invalido.', 'barbearia')
   if (nome.length < 2) return errorResponse('Informe um nome valido.', 'nome')
@@ -104,20 +108,33 @@ export async function POST(request: Request) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const { data: profile } = await supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle()
-  const capacity = profile?.cadeiras_simultaneas ?? 1
-  const { count: occupiedCount, error: occupiedError } = await supabase
-    .from('agendamentos')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', barbeariaId)
-    .eq('data_agendamento', date)
-    .eq('hora_agendamento', time)
-    .eq('status', 'Confirmado')
-  if (occupiedError) {
-    console.error('[api/agendar] capacity lookup failed', { code: occupiedError.code, message: occupiedError.message, date, time })
+  const [{ data: profile }, { data: activeBarbers, error: barbersError }, { data: occupiedRows, error: occupiedError }] = await Promise.all([
+    supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle(),
+    supabase.from('barbeiros').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
+    supabase.from('agendamentos').select('barbeiro_id').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('hora_agendamento', time).eq('status', 'Confirmado'),
+  ])
+  if (barbersError || occupiedError) {
+    console.error('[api/agendar] capacity lookup failed', { barbersError, occupiedError, date, time })
     return errorResponse('Nao foi possivel validar a capacidade.', 'capacity', 500)
   }
-  if ((occupiedCount ?? 0) >= capacity) return errorResponse('Este horario ja atingiu a capacidade da barbearia.', 'time', 409)
+  const capacity = Math.min(profile?.cadeiras_simultaneas ?? 1, activeBarbers?.length || profile?.cadeiras_simultaneas || 1)
+  const occupiedCount = occupiedRows?.length ?? 0
+  if (occupiedCount >= capacity) return errorResponse('Este horario ja atingiu a capacidade da barbearia.', 'time', 409)
+
+  let assignedBarberId: string | null = null
+  if (activeBarbers?.length) {
+    if (requestedBarberId) {
+      if (!uuidPattern.test(requestedBarberId) || !activeBarbers.some((barber) => barber.id === requestedBarberId)) return errorResponse('Barbeiro invalido.', 'barbeiroId')
+      if ((occupiedRows ?? []).some((row) => row.barbeiro_id === requestedBarberId)) return errorResponse('Este barbeiro ja esta ocupado neste horario.', 'barbeiroId', 409)
+      assignedBarberId = requestedBarberId
+    } else {
+      const occupiedByBarber = new Map<string, number>()
+      ;(occupiedRows ?? []).forEach((row) => { if (row.barbeiro_id) occupiedByBarber.set(row.barbeiro_id, (occupiedByBarber.get(row.barbeiro_id) ?? 0) + 1) })
+      const availableBarber = [...activeBarbers].sort((a, b) => (occupiedByBarber.get(a.id) ?? 0) - (occupiedByBarber.get(b.id) ?? 0)).find((barber) => !occupiedByBarber.get(barber.id))
+      if (!availableBarber) return errorResponse('Nenhum barbeiro esta disponivel neste horario.', 'barbeiroId', 409)
+      assignedBarberId = availableBarber.id
+    }
+  }
   let serviceQuery = supabase
     .from('servicos')
     .select('id,nome')
@@ -182,6 +199,7 @@ export async function POST(request: Request) {
       barbearia_id: barbeariaId,
       cliente_id: clientId,
       servico_id: service.id,
+      barbeiro_id: assignedBarberId,
       servico: service.nome,
       data_agendamento: date,
       hora_agendamento: time,

@@ -1,14 +1,15 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, CreditCard, LayoutDashboard, LogOut, Scissors, Settings, User, Users } from 'lucide-react'
+import { BarChart3, CalendarDays, CreditCard, LayoutDashboard, LogOut, Scissors, Settings, User, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Meus Clientes', href: '/clientes', icon: Users },
   { name: 'Agenda', href: '/agenda', icon: CalendarDays },
+  { name: 'Relatorios', href: '/relatorios', icon: BarChart3 },
   { name: 'Assinatura', href: '/assinatura', icon: CreditCard },
   { name: 'Configuracoes', href: '/configuracoes', icon: Settings },
   { name: 'Perfil', href: '/perfil', icon: User },

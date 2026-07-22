@@ -1,15 +1,18 @@
 ﻿'use client'
 
-import { Bell, Clock, Clock3, MessageSquare, Pencil, Plus, Save, Settings, Store, Trash2, X } from 'lucide-react'
+import { Bell, Clock, Clock3, MessageSquare, Pencil, Plus, Save, Settings, Store, Trash2, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Service = { id: string; nome: string; preco: number; duracao_minutos: number }
 type ServiceForm = { nome: string; preco: string; duracao: string }
+type Barber = { id: string; nome: string; ativo: boolean; comissao_percentual: number }
+type BarberForm = { nome: string; comissao: string }
 type Schedule = { dia_semana: number; aberto: boolean; hora_inicio: string; hora_fim: string }
 const dayNames = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado']
 const defaultSchedule: Schedule[] = dayNames.map((_, dia_semana) => ({ dia_semana, aberto: dia_semana !== 0, hora_inicio: dia_semana === 6 ? '08:00' : '09:00', hora_fim: dia_semana === 6 ? '17:00' : '19:00' }))
 const emptyService: ServiceForm = { nome: '', preco: '', duracao: '30' }
+const emptyBarber: BarberForm = { nome: '', comissao: '50' }
 
 export default function ConfiguracoesPage() {
   const [nomeBarbearia, setNomeBarbearia] = useState('Barbearia Jacobina')
@@ -20,13 +23,15 @@ export default function ConfiguracoesPage() {
   const [notifPainel, setNotifPainel] = useState(true)
   const [envioAutomatico, setEnvioAutomatico] = useState(false)
   const [services, setServices] = useState<Service[]>([])
+  const [barbers, setBarbers] = useState<Barber[]>([])
+  const [barberForm, setBarberForm] = useState<BarberForm>(emptyBarber)
   const [serviceForm, setServiceForm] = useState<ServiceForm>(emptyService)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [savingService, setSavingService] = useState(false)
   const [status, setStatus] = useState('')
   const [schedule, setSchedule] = useState<Schedule[]>(defaultSchedule)
 
-  useEffect(() => { void loadServices(); void loadSchedule(); void loadCapacity() }, [])
+  useEffect(() => { void loadServices(); void loadSchedule(); void loadCapacity(); void loadBarbers() }, [])
 
   async function loadCapacity() {
     const supabase = createClient()
@@ -51,6 +56,36 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  async function loadBarbers() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase.from('barbeiros').select('id,nome,ativo,comissao_percentual').eq('user_id', user.id).order('nome')
+    if (error) { setStatus('Erro ao carregar barbeiros: ' + error.message); return }
+    setBarbers((data ?? []) as Barber[])
+  }
+
+  async function saveBarber(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const commission = Number(barberForm.comissao.replace(',', '.'))
+    if (!barberForm.nome.trim() || !Number.isFinite(commission) || commission < 0 || commission > 100) { setStatus('Preencha nome e comissao validos.'); return }
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
+    const { error } = await supabase.from('barbeiros').insert({ user_id: user.id, nome: barberForm.nome.trim(), comissao_percentual: commission })
+    if (error) { setStatus('Erro ao salvar barbeiro: ' + error.message); return }
+    setBarberForm(emptyBarber); setStatus('Barbeiro cadastrado com sucesso!'); await loadBarbers()
+  }
+
+  async function deleteBarber(barber: Barber) {
+    if (!window.confirm('Apagar barbeiro ' + barber.nome + '?')) return
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
+    const { error } = await supabase.from('barbeiros').delete().eq('id', barber.id).eq('user_id', user.id)
+    if (error) { setStatus('Erro ao apagar barbeiro: ' + error.message); return }
+    setBarbers((current) => current.filter((item) => item.id !== barber.id)); setStatus('Barbeiro apagado com sucesso!')
+  }
   async function loadServices() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -133,6 +168,12 @@ export default function ConfiguracoesPage() {
       <Header icon={<MessageSquare className="h-5 w-5" />} title="Marketing e automacao" description="Personalize o texto padrao usado no resgate via WhatsApp." />
       <label className="block text-xs font-medium text-slate-400">Mensagem Padrao<textarea rows={4} value={mensagemPadrao} onChange={(event) => setMensagemPadrao(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm leading-relaxed text-white outline-none transition focus:border-emerald-500" /><span className="mt-2 block text-xs text-slate-500">Dica: use <code className="text-emerald-400">{'{nome}'}</code> e <code className="text-emerald-400">{'{barbearia}'}</code> para personalizar.</span></label>
       <div className="space-y-4 border-t border-slate-800 pt-4"><Toggle label="Avisos Sonoros / Visuais no Painel" description="Destacar clientes sumidos no topo da lista principal." checked={notifPainel} onChange={setNotifPainel} /><Toggle label="Modo de Disparo Assistido" description="Otimizar o link direto para o WhatsApp Web ou Mobile." checked={envioAutomatico} onChange={setEnvioAutomatico} /></div>
+    </section>
+
+    <section className="mt-6 space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl lg:p-8">
+      <Header icon={<Users className="h-5 w-5" />} title="Multiplos barbeiros" description="Cadastre profissionais, comissoes e disponibilidade do Plano Scale." />
+      <form onSubmit={saveBarber} className="grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 md:grid-cols-[1fr_150px_auto]"><Field label="Nome do barbeiro" value={barberForm.nome} onChange={(value) => setBarberForm({ ...barberForm, nome: value })} placeholder="Ex: Samuel Santos" /><Field label="Comissao (%)" value={barberForm.comissao} onChange={(value) => setBarberForm({ ...barberForm, comissao: value })} placeholder="50" type="number" /><div className="flex items-end"><button type="submit" className="w-full rounded-xl bg-emerald-500 px-4 py-3.5 text-sm font-bold text-slate-950 hover:bg-emerald-400">Adicionar barbeiro</button></div></form>
+      <div className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800">{barbers.length ? barbers.map((barber) => <div key={barber.id} className="flex items-center justify-between gap-3 bg-slate-950 p-4"><div><p className="font-semibold text-white">{barber.nome}</p><p className="mt-1 text-xs text-slate-500">Comissao de {Number(barber.comissao_percentual).toFixed(0)}% - {barber.ativo ? 'Ativo' : 'Inativo'}</p></div><button type="button" onClick={() => void deleteBarber(barber)} className="rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/10">Apagar</button></div>) : <p className="p-5 text-sm text-slate-500">Nenhum barbeiro cadastrado.</p>}</div>
     </section>
 
     <section className="mt-6 space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl lg:p-8">

@@ -1,12 +1,13 @@
 ﻿'use client'
 
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, X, XCircle } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, UserRound, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Status = 'Confirmado' | 'Concluido' | 'Cancelado'
 type Service = { id: string; nome: string; preco: number; duracao_minutos: number }
 type Client = { id: string; nome: string; telefone: string }
+type Barber = { id: string; nome: string }
 type Appointment = {
   id: string
   cliente_id: string
@@ -15,15 +16,16 @@ type Appointment = {
   hora_agendamento: string
   servico: string
   status: Status
+  barbeiro_id?: string | null
 }
-type FormState = { clienteId: string; date: string; time: string; serviceId: string }
+type FormState = { clienteId: string; date: string; time: string; serviceId: string; barberId: string }
 type CalendarCell = { date: string; day: number; currentMonth: boolean }
 
 const monthNames = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
 const today = new Date()
 const todayKey = dateKey(today)
-const emptyForm: FormState = { clienteId: '', date: todayKey, time: '09:00', serviceId: '' }
+const emptyForm: FormState = { clienteId: '', date: todayKey, time: '09:00', serviceId: '', barberId: '' }
 
 function dateKey(date: Date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
@@ -38,6 +40,7 @@ function displayDate(value: string) {
 export default function AgendaPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [barbers, setBarbers] = useState<Barber[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
@@ -83,18 +86,21 @@ export default function AgendaPage() {
         return
       }
 
-      const [clientsResult, appointmentsResult, servicesResult] = await Promise.all([
+      const [clientsResult, appointmentsResult, servicesResult, barbersResult] = await Promise.all([
         supabase.from('clientes').select('id,nome,telefone').eq('user_id', user.id).order('nome'),
         supabase.from('agendamentos').select('id,cliente_id,servico_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
         supabase.from('servicos').select('id,nome,preco,duracao_minutos').eq('user_id', user.id).eq('ativo', true).order('nome'),
+        supabase.from('barbeiros').select('id,nome').eq('user_id', user.id).eq('ativo', true).order('nome'),
       ])
 
       if (clientsResult.error) throw clientsResult.error
       if (appointmentsResult.error) throw appointmentsResult.error
       if (servicesResult.error) throw servicesResult.error
+      if (barbersResult.error) throw barbersResult.error
 
       setClients((clientsResult.data ?? []) as Client[])
       setServices((servicesResult.data ?? []) as Service[])
+      setBarbers((barbersResult.data ?? []) as Barber[])
       setAppointments((appointmentsResult.data ?? []) as Appointment[])
       setStatus('')
     } catch (error) {
@@ -130,6 +136,7 @@ export default function AgendaPage() {
   )
   const clientNames = useMemo(() => new Map(clients.map((client) => [client.id, client.nome])), [clients])
   const serviceNames = useMemo(() => new Map(services.map((service) => [service.id, service.nome])), [services])
+  const barberNames = useMemo(() => new Map(barbers.map((barber) => [barber.id, barber.nome])), [barbers])
 
   function changeMonth(offset: number) {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))
@@ -141,7 +148,7 @@ export default function AgendaPage() {
   }
 
   function openModal() {
-    setForm({ ...emptyForm, date: selectedDate, clienteId: clients[0]?.id ?? '', serviceId: services[0]?.id ?? '' })
+    setForm({ ...emptyForm, date: selectedDate, clienteId: clients[0]?.id ?? '', serviceId: services[0]?.id ?? '', barberId: '' })
     setModalOpen(true)
     setStatus('')
   }
@@ -169,6 +176,7 @@ export default function AgendaPage() {
       barbearia_id: user.id,
       cliente_id: form.clienteId,
       servico_id: form.serviceId,
+      barbeiro_id: form.barberId || null,
       data_agendamento: form.date,
       hora_agendamento: form.time,
       servico: service?.nome ?? 'Servico',
@@ -264,7 +272,7 @@ export default function AgendaPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 truncate text-base font-bold text-white"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs text-emerald-300">{(client?.nome ?? 'C').slice(0, 1).toUpperCase()}</span>{client?.nome ?? 'Cliente removido'}</p>
-                      <p className="mt-1 truncate text-xs text-slate-500">{serviceLabel}</p>
+                      <p className="mt-1 flex items-center gap-1 truncate text-xs text-slate-500"><UserRound className="h-3 w-3" />{serviceLabel} - {appointment.barbeiro_id ? barberNames.get(appointment.barbeiro_id) ?? 'Barbeiro' : 'Distribuicao automatica'}</p>
                     </div>
                   </div>
                   <button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="rounded-lg p-2 text-rose-300 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Cancelar agendamento"><XCircle className="h-4 w-4" /></button>
@@ -284,7 +292,7 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) setModalOpen(false) }}><div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="mb-6 flex items-start justify-between"><div><h2 className="text-xl font-bold text-white">Novo agendamento</h2><p className="mt-1 text-sm text-slate-400">Escolha o cliente, horario e servico.</p></div><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div><form onSubmit={createAppointment} className="space-y-4"><label className="block text-sm text-slate-300">Cliente<select required value={form.clienteId} onChange={(event) => setForm({ ...form, clienteId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um cliente</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nome}</option>)}</select></label><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="block text-sm text-slate-300">Data<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Horario<input required type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label></div><label className="block text-sm text-slate-300">Servico<select required value={form.serviceId} onChange={(event) => setForm({ ...form, serviceId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um servico</option>{services.map((service) => <option key={service.id} value={service.id}>{service.nome} - R$ {Number(service.preco).toFixed(2).replace('.', ',')} - {service.duracao_minutos} min</option>)}</select></label><div className="flex justify-end gap-3 border-t border-slate-800 pt-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"><Check className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar agendamento'}</button></div></form></div></div>}
+      {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) setModalOpen(false) }}><div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="mb-6 flex items-start justify-between"><div><h2 className="text-xl font-bold text-white">Novo agendamento</h2><p className="mt-1 text-sm text-slate-400">Escolha o cliente, horario e servico.</p></div><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div><form onSubmit={createAppointment} className="space-y-4"><label className="block text-sm text-slate-300">Cliente<select required value={form.clienteId} onChange={(event) => setForm({ ...form, clienteId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um cliente</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nome}</option>)}</select></label><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="block text-sm text-slate-300">Data<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Horario<input required type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label></div><label className="block text-sm text-slate-300">Barbeiro<select value={form.barberId} onChange={(event) => setForm({ ...form, barberId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Distribuicao automatica</option>{barbers.map((barber) => <option key={barber.id} value={barber.id}>{barber.nome}</option>)}</select></label><label className="block text-sm text-slate-300">Servico<select required value={form.serviceId} onChange={(event) => setForm({ ...form, serviceId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um servico</option>{services.map((service) => <option key={service.id} value={service.id}>{service.nome} - R$ {Number(service.preco).toFixed(2).replace('.', ',')} - {service.duracao_minutos} min</option>)}</select></label><div className="flex justify-end gap-3 border-t border-slate-800 pt-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"><Check className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar agendamento'}</button></div></form></div></div>}
     </main>
   )
 }
