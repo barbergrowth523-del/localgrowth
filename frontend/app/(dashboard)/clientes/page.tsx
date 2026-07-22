@@ -160,7 +160,7 @@ export default function ClientesPage() {
 
   function openWhatsApp(cliente: Client) {
     const telefone = cliente.telefone.replace(/\D/g, '')
-    const mensagem = 'Fala ' + cliente.nome + ', tudo bem? Aqui e da barbearia! Passando para dar aquela moral no visual. Vamos agendar?'
+    const mensagem = 'Fala ' + cliente.nome.split(' ')[0] + '! Tudo bem? Vamos agendar um corte? Escolha seu horario direto aqui: ' + window.location.origin + '/agendar?barbearia=jacobina'
     window.open('https://wa.me/' + telefone + '?text=' + encodeURIComponent(mensagem), '_blank', 'noopener,noreferrer')
   }
 

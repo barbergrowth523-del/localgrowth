@@ -9,6 +9,8 @@ const sample: Client[] = [{ id: '1', name: 'Mariana Costa', phone: '557199876543
 const isOverdue = (date: string) => (Date.now() - new Date(`${date}T12:00:00`).getTime()) / 86400000 > 30
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '')
 const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL ?? ''
+const bookingPath = '/agendar?barbearia=jacobina'
+const getBookingUrl = () => bookingUrl || (typeof window !== 'undefined' ? window.location.origin + bookingPath : bookingPath)
 const countLabel = (count: number, singular: string, plural: string) => `${count} ${count === 1 ? singular : plural}`
 
 function useCountUp(target: number, duration = 650) {
@@ -31,7 +33,7 @@ function useCountUp(target: number, duration = 650) {
 }
 
 function buildWhatsAppMessage(name: string) {
-  const callToAction = bookingUrl ? ' Agende aqui: ' + bookingUrl : ''
+  const callToAction = ' Escolha seu horario direto aqui: ' + getBookingUrl()
   return 'Oi, ' + name.split(' ')[0] + '! Tudo bem? Ja faz um tempinho desde seu ultimo corte. Quer reservar um horario?' + callToAction
 }
 export function Dashboard({ userEmail }: { userEmail: string }) {
