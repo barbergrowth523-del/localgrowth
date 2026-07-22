@@ -1,6 +1,6 @@
 'use client'
 
-import { Clipboard, Copy, MessageCircle, Plus, Printer, QrCode, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { Clipboard, Copy, Download, MessageCircle, Plus, Printer, QrCode, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -87,6 +87,27 @@ export default function ClientesPage() {
     window.setTimeout(() => setCopied(false), 2000)
   }
 
+  async function downloadQrImage() {
+    try {
+      const response = await fetch(qrImageUrl)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'qr-code-cadastro.png'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch {
+      window.open(qrImageUrl, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  function downloadPdf() {
+    printSignupCard()
+  }
+
   function printSignupCard() {
     const printWindow = window.open('', '_blank', 'width=720,height=900')
     if (!printWindow) return
@@ -106,7 +127,7 @@ export default function ClientesPage() {
     <div className="mx-auto w-full max-w-7xl p-6 md:p-8 lg:p-12">
       <div className="mb-8 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center"><div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Users className="h-8 w-8 text-emerald-400" /> Meus Clientes</h1><p className="mt-1 text-sm text-slate-400">Gerencie sua base e acompanhe quem precisa retornar ao salao.</p></div><button onClick={() => setModalOpen(true)} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400"><UserPlus className="h-4 w-4" /> Novo Cliente</button></div>
       {status && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status}</p>}
-      <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl md:p-6"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-start gap-4"><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400"><QrCode className="h-6 w-6" /></div><div><h2 className="text-lg font-bold text-white">Cadastro via QR Code (Auto-atendimento)</h2><p className="mt-1 text-sm text-slate-400">Deixe o cliente preencher os dados pelo celular no final do atendimento.</p></div></div><div className="flex flex-wrap gap-2"><button onClick={printSignupCard} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400"><Printer className="h-4 w-4" /> Imprimir PLACA</button></div></div><div className="mt-5 flex flex-col items-center gap-5 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row"><img src={qrImageUrl} alt="QR Code de cadastro rapido" className="h-64 w-64 shrink-0 rounded-lg bg-white p-3" /><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Link de cadastro rapido</p><input readOnly value={signupUrl} className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-300 outline-none" /><button onClick={copyLink} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400"><Copy className="h-4 w-4" />{copied ? 'Link copiado!' : 'Copiar link'}</button><p className="mt-2 text-xs text-slate-500">Exiba este QR Code no balcao para acelerar novos cadastros.</p></div></div></section>
+      <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl md:p-6"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div className="flex items-start gap-4"><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400"><QrCode className="h-6 w-6" /></div><div><h2 className="text-lg font-bold text-white">Cadastro via QR Code (Auto-atendimento)</h2><p className="mt-1 text-sm text-slate-400">Deixe o cliente preencher os dados pelo celular no final do atendimento.</p></div></div><div className="flex flex-wrap gap-2"><button onClick={printSignupCard} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400"><Printer className="h-4 w-4" /> Imprimir PLACA</button></div></div><div className="mt-5 flex flex-col items-center gap-5 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row"><img src={qrImageUrl} alt="QR Code de cadastro rapido" className="h-64 w-64 shrink-0 rounded-lg bg-white p-3" /><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Link de cadastro rapido</p><input readOnly value={signupUrl} className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 font-mono text-xs text-emerald-300 outline-none" /><button onClick={copyLink} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400"><Copy className="h-4 w-4" />{copied ? 'Link copiado!' : 'Copiar link'}</button><div className="mt-3 flex flex-wrap gap-2"><button onClick={downloadQrImage} className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-slate-900 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/10"><Download className="h-4 w-4" /> Baixar imagem (PNG)</button><button onClick={downloadPdf} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-emerald-500 hover:text-white"><Printer className="h-4 w-4" /> Baixar PDF</button></div><p className="mt-2 text-xs text-slate-500">Exiba este QR Code no balcao para acelerar novos cadastros.</p></div></div></section>
       <div className="relative mb-6"><Search className="absolute left-4 top-4 h-5 w-5 text-slate-500" /><input type="search" placeholder="Buscar cliente por nome ou telefone..." value={busca} onChange={(event) => setBusca(event.target.value)} className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-4 pl-12 pr-4 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-500" /></div>
       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"><div className="overflow-x-auto"><table className="w-full min-w-[820px] border-collapse text-left"><thead><tr className="border-b border-slate-800 bg-slate-950/60 text-xs font-semibold uppercase tracking-wider text-slate-400"><th className="p-5">Cliente</th><th className="p-5">Telefone</th><th className="p-5">Ultimo Corte</th><th className="p-5">Frequencia</th><th className="p-5 text-right">Acao</th></tr></thead><tbody className="divide-y divide-slate-800 text-sm">{clientesFiltrados.length > 0 ? clientesFiltrados.map((cliente) => <ClientRow key={cliente.id} cliente={cliente} onWhatsApp={() => openWhatsApp(cliente)} onDelete={() => void deleteClient(cliente)} />) : <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhum cliente encontrado.</td></tr>}</tbody></table></div></div>
       {modalOpen && <ClientModal form={form} setForm={setForm} saving={saving} onClose={closeModal} onSubmit={handleSubmit} />}
