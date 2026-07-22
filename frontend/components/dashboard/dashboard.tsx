@@ -37,7 +37,7 @@ function buildWhatsAppMessage(name: string) {
 export function Dashboard({ userEmail }: { userEmail: string }) {
   const displayName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Barbeiro').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
-  async function loadClients() { const supabase = createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return } const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true }); if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return } setClients((data ?? []).map(client => ({ id: client.id, name: client.nome, phone: client.telefone, last_cut_at: client.data_ultimo_corte, status_calculado: undefined, frequency: undefined, birthday: undefined }))) }
+  async function loadClients() { const supabase = createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return } const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true }); if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return } setClients((data ?? []).map(client => ({ id: client.id, name: client.nome, phone: client.telefone, last_cut_at: client.data_ultimo_corte, status_calculado: undefined, frequency: undefined, birthday: client.data_nascimento ?? undefined }))) }
   useEffect(() => { void loadClients() }, [])
   const filteredClientes = useMemo(() => { const source = clients.length ? clients : sample; const normalizedSearch = searchTerm.trim().toLowerCase(); return source.filter(client => { const matchesSearch = (client.name + ' ' + client.phone).toLowerCase().includes(normalizedSearch); const normalizedFrequency = client.frequency?.toLowerCase(); const matchesFrequency = frequencyFilter === 'todos' || !normalizedFrequency || normalizedFrequency === frequencyFilter; return matchesSearch && matchesFrequency }) }, [clients, searchTerm, frequencyFilter])
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {
@@ -83,7 +83,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     <div className="mx-auto max-w-7xl px-6 py-10 lg:px-10"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 w-full"><div><p className="text-sm font-medium text-emerald-400">Visao geral</p><h1 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Bom dia, barbeiro.</h1><p className="mt-2 text-slate-400">Veja quem esta esperando por um novo corte.</p></div><div><input ref={fileRef} type="file" accept=".csv,text/csv" onChange={importCsv} className="hidden" /><button disabled={isUploading} onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"><FileUp size={17} /> {isUploading ? 'Importando...' : 'Importar planilha CSV'}</button></div></div>
       {status && <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"><CheckCircle2 size={17} />{status}</div>}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"><MoneyOnTableCard value={atRisk} sumidoCount={sumidoCount} /><RoiBadge multiple={roiMultiple} recoveries={estimatedRecoveries} /><Stat icon={<Users size={18} />} label="Total de clientes" value={dashboardClients.length} /><Stat icon={<CalendarDays size={18} />} label="Cortes este mes" value={dashboardClients.filter(c => new Date(c.last_cut_at).getMonth() === new Date().getMonth()).length} /></div>
-      <BirthdayBanner />
+      <BirthdayPanel clients={dashboardClients} />
       <HealthBaseChart clients={dashboardClients} />
       <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-sm"><div className="flex flex-col justify-between gap-4 border-b border-slate-800 px-5 py-5 sm:flex-row sm:items-center"><div><h2 className="font-semibold">Sua base de clientes</h2><p className="mt-1 text-sm text-slate-500">Clientes ha mais de 30 dias aparecem destacados.</p></div><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-500" /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente" className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 sm:w-56" /></div><select value={frequencyFilter} onChange={event => setFrequencyFilter(event.target.value)} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-300 outline-none focus:border-slate-900"><option value="todos">Todas as frequencias</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-950 text-xs font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-4 font-medium">Cliente</th><th className="px-5 py-4 font-medium">Telefone</th><th className="px-5 py-4 font-medium">Ultimo corte</th><th className="px-5 py-4 font-medium">Status</th><th className="px-5 py-4" /></tr></thead><tbody className="divide-y divide-slate-800">{filteredClientes.length ? filteredClientes.map(client => <ClientRow key={client.id} client={client} onSelect={() => setSelectedClient(client)} />) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado com estes filtros.</td></tr>}</tbody></table></div>{!clients.length && <p className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500">Exibindo exemplos para voce visualizar a tela. Importe sua planilha para comecar.</p>}</section>
     </div><ClientDrawer client={selectedClient} onClose={() => setSelectedClient(null)} /></main>
@@ -113,17 +113,26 @@ function formatPhone(phone: string) {
   if (local.length === 10) return '(' + local.slice(0, 2) + ') ' + local.slice(2, 6) + '-' + local.slice(6)
   return phone
 }
-function BirthdayBanner() {
-  const [copied, setCopied] = useState(false)
-  const template = 'Oi, [nome]! Feliz aniversario! Para comemorar, seu proximo corte tem 15% de desconto. Quer reservar seu horario?'
-  async function copyTemplate() {
-    await navigator.clipboard?.writeText(template)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1800)
-  }
-  return <div className="mb-6 flex flex-row items-center justify-between gap-4 rounded-lg border border-slate-800 bg-slate-950 p-3 px-4"><div className="flex items-center gap-3"><Cake size={18} className="text-amber-600" /><p className="text-sm font-medium text-slate-300">Cadastre datas de nascimento</p></div><button onClick={copyTemplate} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 transition hover:text-white">{copied ? <CheckCircle2 size={14} /> : <Clipboard size={14} />}{copied ? 'Template copiado' : 'Copiar template de 15% OFF'}</button></div>
-}
+function BirthdayPanel({ clients }: { clients: Client[] }) {
+  const now = new Date()
+  const month = now.getMonth()
+  const currentDay = now.getDate()
+  const birthdayClients = clients.filter((client) => {
+    if (!client.birthday) return false
+    const parts = client.birthday.split('-').map(Number)
+    return parts[1] - 1 === month
+  }).sort((first, second) => Number(first.birthday?.slice(-2)) - Number(second.birthday?.slice(-2)))
 
+  function openBirthdayWhatsApp(client: Client) {
+    const digits = client.phone.replace(/\D/g, '')
+    const phone = digits.startsWith('55') ? digits : '55' + digits
+    const firstName = client.name.split(' ')[0]
+    const message = 'Oi, ' + firstName + '! Feliz aniversario! Para comemorar, seu proximo corte tem 15% de desconto com o cupom BARBER15. Quer reservar seu horario?'
+    window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(message), '_blank', 'noopener,noreferrer')
+  }
+
+  return <section className="mb-6 rounded-xl border border-slate-800 bg-slate-900 p-5 shadow-sm"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><div className="rounded-lg bg-amber-500/10 p-2 text-amber-400"><Cake size={18} /></div><div><h2 className="font-semibold text-white">Aniversariantes do mes</h2><p className="mt-1 text-xs text-slate-500">Parabenize seus clientes e ofereca 15% de desconto no proximo corte.</p></div></div><span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300">{birthdayClients.length} neste mes</span></div>{birthdayClients.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{birthdayClients.map((client) => { const day = Number(client.birthday?.slice(-2)); const thisWeek = day >= currentDay && day <= currentDay + 7; return <div key={client.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{client.name}</p><p className="mt-1 text-xs text-slate-500">Dia {String(day).padStart(2, '0')} {thisWeek ? '- Nesta semana' : ''}</p></div><button type="button" onClick={() => openBirthdayWhatsApp(client)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"><MessageCircle size={14} /> WhatsApp</button></div> })}</div> : <div className="mt-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 text-center text-sm text-slate-500">Nenhum aniversariante cadastrado neste mes. Adicione datas no cadastro de clientes.</div>}</section>
+}
 function HealthBaseChart({ clients }: { clients: Client[] }) {
   const totals = clients.reduce((summary, client) => {
     summary[getRetentionStatus(client)] += 1

@@ -6,12 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import { jsPDF } from 'jspdf'
 
 type Frequency = 'semanal' | 'quinzenal' | 'mensal'
-type Client = { id: string; nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean }
+type Client = { id: string; nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean; dataNascimento?: string }
 
 const initialClients: Client[] = [
-  { id: 'sample-1', nome: 'Pedro Souza', telefone: '(74) 98888-7777', ultimoCorte: '2026-05-15', frequencia: 'mensal', novo: false },
+  { id: 'sample-1', nome: 'Pedro Souza', telefone: '(74) 98888-7777', ultimoCorte: '2026-05-15', frequencia: 'mensal', novo: false, dataNascimento: undefined },
   { id: 'sample-2', nome: 'Lucas Almeida', telefone: '(74) 99111-2233', ultimoCorte: '2026-06-10', frequencia: 'quinzenal', novo: false },
-  { id: 'sample-3', nome: 'Carlos Silva', telefone: '(74) 99999-4455', ultimoCorte: '2026-04-02', frequencia: 'mensal', novo: false },
+  { id: 'sample-3', nome: 'Carlos Silva', telefone: '(74) 99999-4455', ultimoCorte: '2026-04-02', frequencia: 'mensal', novo: false, dataNascimento: undefined },
 ]
 
 const signupPath = '/cadastrar?barbearia=jacobina'
@@ -33,7 +33,7 @@ export default function ClientesPage() {
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
-  const [form, setForm] = useState({ nome: '', telefone: '', ultimoCorte: '', frequencia: 'mensal' as Frequency, novo: false })
+  const [form, setForm] = useState({ nome: '', telefone: '', ultimoCorte: '', frequencia: 'mensal' as Frequency, novo: false, dataNascimento: '' })
 
   useEffect(() => {
     setSignupUrl(window.location.origin + signupPath)
@@ -51,15 +51,15 @@ export default function ClientesPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
-    const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+    const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
     if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return }
     if (!data?.length) { setClientes(initialClients); return }
-    setClientes(data.map((cliente) => ({ id: String(cliente.id), nome: cliente.nome, telefone: cliente.telefone, ultimoCorte: cliente.data_ultimo_corte, frequencia: 'mensal', novo: false })))
+    setClientes(data.map((cliente) => ({ id: String(cliente.id), nome: cliente.nome, telefone: cliente.telefone, ultimoCorte: cliente.data_ultimo_corte, frequencia: 'mensal', novo: false, dataNascimento: cliente.data_nascimento ?? undefined })))
   }
 
   function closeModal() {
     setModalOpen(false)
-    setForm({ nome: '', telefone: '', ultimoCorte: '', frequencia: 'mensal', novo: false })
+    setForm({ nome: '', telefone: '', ultimoCorte: '', frequencia: 'mensal', novo: false, dataNascimento: '' })
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -70,7 +70,7 @@ export default function ClientesPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); setSaving(false); return }
     const date = form.novo ? new Date().toISOString().slice(0, 10) : form.ultimoCorte
-    const { error } = await supabase.from('clientes').insert({ nome: form.nome.trim(), telefone: form.telefone.trim(), data_ultimo_corte: date, barbearia_id: user.id, user_id: user.id })
+    const { error } = await supabase.from('clientes').insert({ nome: form.nome.trim(), telefone: form.telefone.trim(), data_ultimo_corte: date, data_nascimento: form.dataNascimento || null, barbearia_id: user.id, user_id: user.id })
     if (error) { setStatus('Erro ao salvar cliente: ' + error.message); setSaving(false); return }
     await loadClients()
     setStatus('Cliente salvo com sucesso!')
@@ -172,8 +172,8 @@ function ClientRow({ cliente, onWhatsApp, onDelete }: { cliente: Client; onWhats
   return <tr className="transition hover:bg-slate-800/50"><td className="p-5 font-semibold text-slate-200">{cliente.nome}</td><td className="p-5 text-slate-400">{cliente.telefone}</td><td className="p-5 text-slate-400">{cliente.novo ? 'Novo cliente' : formatDate(cliente.ultimoCorte)}</td><td className="p-5 text-slate-400 capitalize">{cliente.frequencia}</td><td className="p-5 text-right"><div className="inline-flex gap-2"><button onClick={onWhatsApp} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button><button onClick={onDelete} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20"><Trash2 className="h-3.5 w-3.5" /> Excluir</button></div></td></tr>
 }
 
-function ClientModal({ form, setForm, saving, onClose, onSubmit }: { form: { nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean }; setForm: (value: { nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean }) => void; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}><div role="dialog" aria-modal="true" aria-labelledby="client-modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="mb-6 flex items-start justify-between"><div><h2 id="client-modal-title" className="text-xl font-bold text-white">Cadastrar novo cliente</h2><p className="mt-1 text-sm text-slate-400">Adicione um cliente manualmente na sua base.</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white" aria-label="Fechar modal"><X className="h-5 w-5" /></button></div><form onSubmit={onSubmit} className="space-y-4"><Field label="Nome Completo" value={form.nome} onChange={(value) => setForm({ ...form, nome: value })} placeholder="Ex: Joao Silva" required /><Field label="Telefone / WhatsApp" value={form.telefone} onChange={(value) => setForm({ ...form, telefone: value })} placeholder="(00) 00000-0000" required /><label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-300"><input type="checkbox" checked={form.novo} onChange={(event) => setForm({ ...form, novo: event.target.checked, ultimoCorte: '' })} className="h-4 w-4 accent-emerald-500" /> Novo cliente</label>{!form.novo && <Field label="Data do Ultimo Corte" type="date" value={form.ultimoCorte} onChange={(value) => setForm({ ...form, ultimoCorte: value })} required />}<label className="block text-sm text-slate-300">Frequencia esperada<select required value={form.frequencia} onChange={(event) => setForm({ ...form, frequencia: event.target.value as Frequency })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></label><div className="flex justify-end gap-3 border-t border-slate-800 pt-5"><button type="button" onClick={onClose} className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800">Cancelar</button><button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"><Plus className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar cliente'}</button></div></form></div></div>
+function ClientModal({ form, setForm, saving, onClose, onSubmit }: { form: { nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean; dataNascimento: string }; setForm: (value: { nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean; dataNascimento: string }) => void; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}><div role="dialog" aria-modal="true" aria-labelledby="client-modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="mb-6 flex items-start justify-between"><div><h2 id="client-modal-title" className="text-xl font-bold text-white">Cadastrar novo cliente</h2><p className="mt-1 text-sm text-slate-400">Adicione um cliente manualmente na sua base.</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white" aria-label="Fechar modal"><X className="h-5 w-5" /></button></div><form onSubmit={onSubmit} className="space-y-4"><Field label="Nome Completo" value={form.nome} onChange={(value) => setForm({ ...form, nome: value })} placeholder="Ex: Joao Silva" required /><Field label="Telefone / WhatsApp" value={form.telefone} onChange={(value) => setForm({ ...form, telefone: value })} placeholder="(00) 00000-0000" required /><Field label="Data de nascimento" type="date" value={form.dataNascimento} onChange={(value) => setForm({ ...form, dataNascimento: value })} placeholder="AAAA-MM-DD" /><label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-300"><input type="checkbox" checked={form.novo} onChange={(event) => setForm({ ...form, novo: event.target.checked, ultimoCorte: '' })} className="h-4 w-4 accent-emerald-500" /> Novo cliente</label>{!form.novo && <Field label="Data do Ultimo Corte" type="date" value={form.ultimoCorte} onChange={(value) => setForm({ ...form, ultimoCorte: value })} required />}<label className="block text-sm text-slate-300">Frequencia esperada<select required value={form.frequencia} onChange={(event) => setForm({ ...form, frequencia: event.target.value as Frequency })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></label><div className="flex justify-end gap-3 border-t border-slate-800 pt-5"><button type="button" onClick={onClose} className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800">Cancelar</button><button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"><Plus className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar cliente'}</button></div></form></div></div>
 }
 
 function Field({ label, value, onChange, placeholder, type = 'text', required = false }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean }) {
