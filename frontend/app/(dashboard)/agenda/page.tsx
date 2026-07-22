@@ -1,49 +1,98 @@
-'use client'
+﻿'use client'
 
-import { CalendarDays, Check, Clock3, Plus, X, XCircle } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Status = 'Confirmado' | 'Concluido' | 'Cancelado'
 type Service = { id: string; nome: string; preco: number; duracao_minutos: number }
 type Client = { id: string; nome: string; telefone: string }
-type Appointment = { id: string; cliente_id: string; servico_id?: string | null; data_agendamento: string; hora_agendamento: string; servico: string; status: Status }
+type Appointment = {
+  id: string
+  cliente_id: string
+  servico_id?: string | null
+  data_agendamento: string
+  hora_agendamento: string
+  servico: string
+  status: Status
+}
 type FormState = { clienteId: string; date: string; time: string; serviceId: string }
+type CalendarCell = { date: string; day: number; currentMonth: boolean }
 
-const today = new Date().toISOString().slice(0, 10)
-const emptyForm: FormState = { clienteId: '', date: today, time: '09:00', serviceId: '' }
+const monthNames = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+const today = new Date()
+const todayKey = dateKey(today)
+const emptyForm: FormState = { clienteId: '', date: todayKey, time: '09:00', serviceId: '' }
+
+function dateKey(date: Date) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+}
+
+
+function displayDate(value: string) {
+  const [year, month, day] = value.split('-')
+  return day + '/' + month + '/' + year
+}
 
 export default function AgendaPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [selectedDate, setSelectedDate] = useState(today)
+  const [selectedDate, setSelectedDate] = useState(todayKey)
+  const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [form, setForm] = useState<FormState>(emptyForm)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { void loadAgendaData() }, [])
+  useEffect(() => {
+    void loadAgendaData()
+  }, [])
+
+  useEffect(() => {
+    let channel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null
+    let active = true
+
+    async function subscribe() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !active) return
+      channel = supabase
+        .channel('agenda-' + user.id)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos', filter: 'user_id=eq.' + user.id }, () => {
+          void loadAgendaData()
+        })
+        .subscribe()
+    }
+
+    void subscribe()
+    return () => {
+      active = false
+      if (channel) void createClient().removeChannel(channel)
+    }
+  }, [])
 
   async function loadAgendaData() {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
+      if (!user) {
+        setStatus('Sua sessao expirou. Entre novamente.')
+        return
+      }
+
       const [clientsResult, appointmentsResult, servicesResult] = await Promise.all([
         supabase.from('clientes').select('id,nome,telefone').eq('user_id', user.id).order('nome'),
         supabase.from('agendamentos').select('id,cliente_id,servico_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
         supabase.from('servicos').select('id,nome,preco,duracao_minutos').eq('user_id', user.id).eq('ativo', true).order('nome'),
       ])
+
       if (clientsResult.error) throw clientsResult.error
-      if (appointmentsResult.error) {
-        const errorMessage = appointmentsResult.error.message?.toLowerCase() ?? ''
-        if (appointmentsResult.error.code === '42P01' || errorMessage.includes('agendamentos') && errorMessage.includes('does not exist')) {
-          setClients((clientsResult.data ?? []) as Client[]); setAppointments([]); setStatus('A Agenda ainda nao esta configurada no banco.'); return
-        }
-        throw appointmentsResult.error
-      }
+      if (appointmentsResult.error) throw appointmentsResult.error
       if (servicesResult.error) throw servicesResult.error
+
       setClients((clientsResult.data ?? []) as Client[])
       setServices((servicesResult.data ?? []) as Service[])
       setAppointments((appointmentsResult.data ?? []) as Appointment[])
@@ -51,38 +100,159 @@ export default function AgendaPage() {
     } catch (error) {
       setStatus(error instanceof Error ? 'Erro ao carregar a Agenda: ' + error.message : 'Erro ao carregar a Agenda. Verifique o banco de dados.')
       setAppointments([])
+    } finally {
+      setLoading(false)
     }
   }
 
-  const dayAppointments = useMemo(() => appointments.filter((item) => item.data_agendamento === selectedDate), [appointments, selectedDate])
+  const appointmentsByDate = useMemo(() => {
+    const counts = new Map<string, number>()
+    appointments.forEach((appointment) => counts.set(appointment.data_agendamento, (counts.get(appointment.data_agendamento) ?? 0) + 1))
+    return counts
+  }, [appointments])
+
+  const calendarCells = useMemo<CalendarCell[]>(() => {
+    const firstDay = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1)
+    const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate()
+    const cells: CalendarCell[] = []
+    for (let index = 0; index < firstDay.getDay(); index += 1) cells.push({ date: '', day: 0, currentMonth: false })
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day)
+      cells.push({ date: dateKey(date), day, currentMonth: true })
+    }
+    while (cells.length % 7 !== 0) cells.push({ date: '', day: 0, currentMonth: false })
+    return cells
+  }, [visibleMonth])
+
+  const dayAppointments = useMemo(
+    () => appointments.filter((item) => item.data_agendamento === selectedDate).sort((a, b) => a.hora_agendamento.localeCompare(b.hora_agendamento)),
+    [appointments, selectedDate],
+  )
   const clientNames = useMemo(() => new Map(clients.map((client) => [client.id, client.nome])), [clients])
   const serviceNames = useMemo(() => new Map(services.map((service) => [service.id, service.nome])), [services])
 
+  function changeMonth(offset: number) {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))
+  }
+
+  function selectDate(date: string) {
+    if (!date) return
+    setSelectedDate(date)
+  }
+
   function openModal() {
     setForm({ ...emptyForm, date: selectedDate, clienteId: clients[0]?.id ?? '', serviceId: services[0]?.id ?? '' })
-    setModalOpen(true); setStatus('')
+    setModalOpen(true)
+    setStatus('')
   }
 
   async function createAppointment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.clienteId || !form.serviceId) { setStatus('Selecione um cliente e um servico para continuar.'); return }
-    setSaving(true); setStatus('')
+    if (!form.clienteId || !form.serviceId) {
+      setStatus('Selecione um cliente e um servico para continuar.')
+      return
+    }
+
+    setSaving(true)
+    setStatus('')
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); setSaving(false); return }
+    if (!user) {
+      setStatus('Sua sessao expirou. Entre novamente.')
+      setSaving(false)
+      return
+    }
+
     const service = services.find((item) => item.id === form.serviceId)
-    const { error } = await supabase.from('agendamentos').insert({ user_id: user.id, barbearia_id: user.id, cliente_id: form.clienteId, servico_id: form.serviceId, data_agendamento: form.date, hora_agendamento: form.time, servico: service?.nome ?? 'Servico', status: 'Confirmado' })
-    if (error) { setStatus('Erro ao salvar agendamento: ' + error.message); setSaving(false); return }
-    setSelectedDate(form.date); setModalOpen(false); setForm(emptyForm); setStatus('Agendamento criado com sucesso.'); await loadAgendaData(); setSaving(false)
+    const { error } = await supabase.from('agendamentos').insert({
+      user_id: user.id,
+      barbearia_id: user.id,
+      cliente_id: form.clienteId,
+      servico_id: form.serviceId,
+      data_agendamento: form.date,
+      hora_agendamento: form.time,
+      servico: service?.nome ?? 'Servico',
+      status: 'Confirmado',
+    })
+
+    if (error) {
+      setStatus('Erro ao salvar agendamento: ' + error.message)
+      setSaving(false)
+      return
+    }
+
+    setSelectedDate(form.date)
+    setVisibleMonth(new Date(form.date + 'T12:00:00'))
+    setModalOpen(false)
+    setForm(emptyForm)
+    setStatus('Agendamento criado com sucesso.')
+    await loadAgendaData()
+    setSaving(false)
   }
 
   async function updateStatus(appointment: Appointment, nextStatus: Status) {
     try {
-      const { error } = await createClient().from('agendamentos').update({ status: nextStatus }).eq('id', appointment.id)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Sessao expirada')
+      const { error } = await supabase.from('agendamentos').update({ status: nextStatus }).eq('id', appointment.id).eq('user_id', user.id)
       if (error) throw error
       setAppointments((current) => current.map((item) => item.id === appointment.id ? { ...item, status: nextStatus } : item))
-    } catch { setStatus('Nao foi possivel atualizar o status. Verifique a tabela agendamentos.') }
+    } catch {
+      setStatus('Nao foi possivel atualizar o status. Verifique a tabela agendamentos.')
+    }
   }
 
-  return <main className="min-h-screen bg-slate-950 p-6 text-white md:p-8 lg:p-12"><div className="mx-auto max-w-7xl"><div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-center"><div><p className="text-sm font-medium text-emerald-400">Organizacao do salao</p><h1 className="mt-2 flex items-center gap-3 text-3xl font-bold"><CalendarDays className="h-8 w-8 text-emerald-400" /> Agenda</h1><p className="mt-2 text-sm text-slate-400">Gerencie os cortes marcados e mantenha sua cadeira ocupada.</p></div><button type="button" onClick={openModal} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"><Plus className="h-4 w-4" /> Novo agendamento</button></div>{status && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status}</p>}{!services.length && <p className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">Cadastre seus servicos em Configuracoes antes de criar um agendamento.</p>}<section className="rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl"><div className="flex flex-col gap-4 border-b border-slate-800 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-white">Horarios marcados</h2><p className="mt-1 text-xs text-slate-500">Veja e atualize o status de cada atendimento.</p></div><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500" /></div>{dayAppointments.length ? <div className="divide-y divide-slate-800">{dayAppointments.map((appointment) => <div key={appointment.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-4"><div className="flex h-12 w-16 items-center justify-center rounded-xl bg-emerald-500/10 text-sm font-bold text-emerald-300"><Clock3 className="mr-1 h-4 w-4" />{appointment.hora_agendamento.slice(0, 5)}</div><div><p className="font-semibold text-white">{clientNames.get(appointment.cliente_id) ?? 'Cliente removido'}</p><p className="mt-1 text-xs text-slate-500">{appointment.servico_id ? serviceNames.get(appointment.servico_id) ?? appointment.servico : appointment.servico}</p></div></div><select value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'rounded-lg border px-3 py-2 text-xs font-semibold outline-none ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 bg-sky-500/10 text-sky-300' : 'border-rose-500/20 bg-rose-500/10 text-rose-300')}><option>Confirmado</option><option>Concluido</option><option>Cancelado</option></select><button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40"><XCircle className="h-4 w-4" /> Cancelar</button></div>)}</div> : <div className="p-12 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-slate-600"><Clock3 className="h-6 w-6" /></div><p className="mt-4 font-semibold text-slate-300">Nenhum horario marcado.</p><p className="mt-1 text-sm text-slate-500">Crie um novo agendamento para preencher sua agenda.</p></div>}</section></div>{modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) setModalOpen(false) }}><div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="mb-6 flex items-start justify-between"><div><h2 className="text-xl font-bold text-white">Novo agendamento</h2><p className="mt-1 text-sm text-slate-400">Escolha o cliente, horario e servico.</p></div><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div><form onSubmit={createAppointment} className="space-y-4"><label className="block text-sm text-slate-300">Cliente<select required value={form.clienteId} onChange={(event) => setForm({ ...form, clienteId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um cliente</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nome}</option>)}</select></label><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="block text-sm text-slate-300">Data<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Horario<input required type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label></div><label className="block text-sm text-slate-300">Servico<select required value={form.serviceId} onChange={(event) => setForm({ ...form, serviceId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um servico</option>{services.map((service) => <option key={service.id} value={service.id}>{service.nome} - R$ {Number(service.preco).toFixed(2).replace('.', ',')} - {service.duracao_minutos} min</option>)}</select></label><div className="flex justify-end gap-3 border-t border-slate-800 pt-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"><Check className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar agendamento'}</button></div></form></div></div>}</main>
+  return (
+    <main className="min-h-screen bg-slate-950 p-6 text-white md:p-8 lg:p-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-center">
+          <div>
+            <p className="text-sm font-medium text-emerald-400">Organizacao do salao</p>
+            <h1 className="mt-2 flex items-center gap-3 text-3xl font-bold"><CalendarDays className="h-8 w-8 text-emerald-400" /> Agenda</h1>
+            <p className="mt-2 text-sm text-slate-400">Gerencie os cortes marcados e mantenha sua cadeira ocupada.</p>
+          </div>
+          <button type="button" onClick={openModal} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"><Plus className="h-4 w-4" /> Novo agendamento</button>
+        </div>
+
+        {status && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status}</p>}
+        {!services.length && !loading && <p className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">Cadastre seus servicos em Configuracoes antes de criar um agendamento.</p>}
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,1fr)]">
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Calendario</p>
+                <h2 className="mt-1 text-xl font-bold text-white">{monthNames[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}</h2>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => changeMonth(-1)} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Mes anterior"><ChevronLeft className="h-4 w-4" /></button>
+                <button type="button" onClick={() => { setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDate(todayKey) }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Hoje</button>
+                <button type="button" onClick={() => changeMonth(1)} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Proximo mes"><ChevronRight className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-500">{weekDays.map((day) => <span key={day} className="py-2">{day}</span>)}</div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {calendarCells.map((cell, index) => {
+                const count = cell.date ? appointmentsByDate.get(cell.date) ?? 0 : 0
+                const isSelected = cell.date === selectedDate
+                const isToday = cell.date === todayKey
+                return <button key={cell.date || 'empty-' + index} type="button" disabled={!cell.date} onClick={() => selectDate(cell.date)} className={'min-h-16 rounded-xl border p-2 text-left transition ' + (!cell.date ? 'cursor-default border-transparent bg-transparent' : isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-950 hover:border-slate-700')}>{cell.date && <><span className={'text-sm font-semibold ' + (isToday ? 'text-emerald-300' : 'text-slate-300')}>{cell.day}</span>{count > 0 ? <span className="mt-2 flex items-center gap-1 text-[10px] font-bold text-emerald-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{count} corte{count === 1 ? '' : 's'}</span> : <span className="mt-2 block text-[10px] text-slate-600">Livre</span>}</>}</button>
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 p-5">
+              <div><h2 className="font-semibold text-white">Horarios marcados</h2><p className="mt-1 text-xs text-slate-500">{displayDate(selectedDate)} - {dayAppointments.length ? dayAppointments.length + (dayAppointments.length === 1 ? ' corte' : ' cortes') : 'Disponivel'}</p></div>
+              <Clock3 className="h-5 w-5 text-emerald-400" />
+            </div>
+            {dayAppointments.length ? <div className="divide-y divide-slate-800">{dayAppointments.map((appointment) => <div key={appointment.id} className="space-y-3 p-5"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-lg bg-emerald-500/10 px-2.5 py-2 text-sm font-bold text-emerald-300">{appointment.hora_agendamento.slice(0, 5)}</span><div><p className="font-semibold text-white">{clientNames.get(appointment.cliente_id) ?? 'Cliente removido'}</p><p className="mt-1 text-xs text-slate-500">{appointment.servico_id ? serviceNames.get(appointment.servico_id) ?? appointment.servico : appointment.servico}</p></div></div><button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="rounded-lg p-2 text-rose-300 hover:bg-rose-500/10 disabled:opacity-40" aria-label="Cancelar agendamento"><XCircle className="h-4 w-4" /></button></div><select value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'w-full rounded-lg border px-3 py-2 text-xs font-semibold outline-none ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 bg-sky-500/10 text-sky-300' : 'border-rose-500/20 bg-rose-500/10 text-rose-300')}><option>Confirmado</option><option>Concluido</option><option>Cancelado</option></select></div>)}</div> : <div className="p-10 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-slate-600"><Clock3 className="h-6 w-6" /></div><p className="mt-4 font-semibold text-slate-300">Nenhum horario marcado.</p><p className="mt-1 text-sm text-slate-500">Este dia esta livre para novos agendamentos.</p></div>}
+          </section>
+        </div>
+      </div>
+
+      {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={(event) => { if (event.target === event.currentTarget) setModalOpen(false) }}><div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="mb-6 flex items-start justify-between"><div><h2 className="text-xl font-bold text-white">Novo agendamento</h2><p className="mt-1 text-sm text-slate-400">Escolha o cliente, horario e servico.</p></div><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div><form onSubmit={createAppointment} className="space-y-4"><label className="block text-sm text-slate-300">Cliente<select required value={form.clienteId} onChange={(event) => setForm({ ...form, clienteId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um cliente</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.nome}</option>)}</select></label><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="block text-sm text-slate-300">Data<input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Horario<input required type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500" /></label></div><label className="block text-sm text-slate-300">Servico<select required value={form.serviceId} onChange={(event) => setForm({ ...form, serviceId: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"><option value="">Selecione um servico</option>{services.map((service) => <option key={service.id} value={service.id}>{service.nome} - R$ {Number(service.preco).toFixed(2).replace('.', ',')} - {service.duracao_minutos} min</option>)}</select></label><div className="flex justify-end gap-3 border-t border-slate-800 pt-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={saving} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-60"><Check className="h-4 w-4" />{saving ? 'Salvando...' : 'Salvar agendamento'}</button></div></form></div></div>}
+    </main>
+  )
 }
