@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, X, XCircle } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -247,7 +247,39 @@ export default function AgendaPage() {
               <div><h2 className="font-semibold text-white">Horarios marcados</h2><p className="mt-1 text-xs text-slate-500">{displayDate(selectedDate)} - {dayAppointments.length ? dayAppointments.length + (dayAppointments.length === 1 ? ' corte' : ' cortes') : 'Disponivel'}</p></div>
               <Clock3 className="h-5 w-5 text-emerald-400" />
             </div>
-            {dayAppointments.length ? <div className="divide-y divide-slate-800">{dayAppointments.map((appointment) => <div key={appointment.id} className="space-y-3 p-5"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-lg bg-emerald-500/10 px-2.5 py-2 text-sm font-bold text-emerald-300">{appointment.hora_agendamento.slice(0, 5)}</span><div><p className="font-semibold text-white">{clientNames.get(appointment.cliente_id) ?? 'Cliente removido'}</p><p className="mt-1 text-xs text-slate-500">{appointment.servico_id ? serviceNames.get(appointment.servico_id) ?? appointment.servico : appointment.servico}</p></div></div><button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="rounded-lg p-2 text-rose-300 hover:bg-rose-500/10 disabled:opacity-40" aria-label="Cancelar agendamento"><XCircle className="h-4 w-4" /></button></div><select value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'w-full rounded-lg border px-3 py-2 text-xs font-semibold outline-none ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 bg-sky-500/10 text-sky-300' : 'border-rose-500/20 bg-rose-500/10 text-rose-300')}><option>Confirmado</option><option>Concluido</option><option>Cancelado</option></select></div>)}</div> : <div className="p-10 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-slate-600"><Clock3 className="h-6 w-6" /></div><p className="mt-4 font-semibold text-slate-300">Nenhum horario marcado.</p><p className="mt-1 text-sm text-slate-500">Este dia esta livre para novos agendamentos.</p></div>}
+            {dayAppointments.length ? <div className="space-y-3 p-4">{dayAppointments.map((appointment) => {
+              const client = clients.find((item) => item.id === appointment.cliente_id)
+              const service = services.find((item) => item.id === appointment.servico_id)
+              const phone = client?.telefone.replace(/\\D/g, '') ?? ''
+              const whatsappPhone = phone.startsWith('55') ? phone : '55' + phone
+              const whatsappMessage = encodeURIComponent('Fala ' + (client?.nome.split(' ')[0] ?? 'cliente') + '! Seu horario esta confirmado. Se precisar falar com a barbearia, estamos por aqui.')
+              const serviceLabel = service?.nome ?? appointment.servico
+              const servicePrice = service ? 'R$ ' + Number(service.preco).toFixed(2).replace('.', ',') : 'Preco nao informado'
+              return <article key={appointment.id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg shadow-emerald-950/10 transition hover:border-emerald-500/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-14 w-16 flex-col items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-300">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Horario</span>
+                      <span className="mt-0.5 text-lg font-bold">{appointment.hora_agendamento.slice(0, 5)}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 truncate text-base font-bold text-white"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs text-emerald-300">{(client?.nome ?? 'C').slice(0, 1).toUpperCase()}</span>{client?.nome ?? 'Cliente removido'}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">{serviceLabel}</p>
+                    </div>
+                  </div>
+                  <button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="rounded-lg p-2 text-rose-300 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Cancelar agendamento"><XCircle className="h-4 w-4" /></button>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 border-y border-slate-800 py-3">
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Servico</p><p className="mt-1 text-sm font-semibold text-slate-200">{serviceLabel}</p></div>
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Valor</p><p className="mt-1 text-sm font-semibold text-emerald-300">{servicePrice}</p></div>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Telefone</p><p className="mt-1 truncate text-xs text-slate-400">{client?.telefone ?? 'Nao informado'}</p></div>
+                  {phone && <a href={'https://wa.me/' + whatsappPhone + '?text=' + whatsappMessage} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500 hover:text-slate-950"><MessageCircle className="h-3.5 w-3.5" /> Mensagem</a>}
+                </div>
+                <select aria-label="Status do agendamento" value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'mt-4 w-full rounded-lg border bg-slate-900 px-3 py-2.5 text-xs font-semibold outline-none transition ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 text-sky-300' : 'border-rose-500/20 text-rose-300')}><option>Confirmado</option><option>Concluido</option><option>Cancelado</option></select>
+              </article>
+            })}</div> : <div className="p-10 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-slate-600"><Clock3 className="h-6 w-6" /></div><p className="mt-4 font-semibold text-slate-300">Nenhum horario marcado.</p><p className="mt-1 text-sm text-slate-500">Este dia esta livre para novos agendamentos.</p></div>}
           </section>
         </div>
       </div>
