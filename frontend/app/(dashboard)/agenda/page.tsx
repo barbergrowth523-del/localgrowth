@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, UserRound, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -221,7 +221,7 @@ export default function AgendaPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 p-6 text-white md:p-8 lg:p-12">
+    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-8 lg:p-12">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-center">
           <div>
@@ -236,13 +236,13 @@ export default function AgendaPage() {
         {!services.length && !loading && <p className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">Cadastre seus servicos em Configuracoes antes de criar um agendamento.</p>}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,1fr)]">
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
+          <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-2xl sm:p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Calendario</p>
                 <h2 className="mt-1 text-xl font-bold text-white">{monthNames[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}</h2>
               </div>
-              <div className="flex gap-2">
+              <div className="flex w-full gap-2 sm:w-auto">
                 <button type="button" onClick={() => changeMonth(-1)} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Mes anterior"><ChevronLeft className="h-4 w-4" /></button>
                 <button type="button" onClick={() => { setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDate(todayKey) }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Hoje</button>
                 <button type="button" onClick={() => changeMonth(1)} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Proximo mes"><ChevronRight className="h-4 w-4" /></button>
@@ -259,7 +259,7 @@ export default function AgendaPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+          <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 p-5">
               <div><h2 className="font-semibold text-white">Horarios marcados</h2><p className="mt-1 text-xs text-slate-500">{displayDate(selectedDate)} - {dayAppointments.length ? dayAppointments.length + (dayAppointments.length === 1 ? ' corte' : ' cortes') : 'Disponivel'}</p></div>
               <Clock3 className="h-5 w-5 text-emerald-400" />
