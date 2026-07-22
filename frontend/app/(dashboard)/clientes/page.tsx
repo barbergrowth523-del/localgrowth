@@ -3,6 +3,7 @@
 import { Clipboard, Copy, Download, MessageCircle, Plus, Printer, QrCode, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { jsPDF } from 'jspdf'
 
 type Frequency = 'semanal' | 'quinzenal' | 'mensal'
 type Client = { id: string; nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean }
@@ -14,6 +15,15 @@ const initialClients: Client[] = [
 ]
 
 const signupPath = '/cadastrar?barbearia=jacobina'
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Client[]>(initialClients)
@@ -41,7 +51,6 @@ export default function ClientesPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
-    setSignupUrl(window.location.origin + '/cadastrar?barbearia=' + user.id)
     const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
     if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return }
     if (!data?.length) { setClientes(initialClients); return }
@@ -104,9 +113,33 @@ export default function ClientesPage() {
     }
   }
 
-  function downloadPdf() {
-    printSignupCard()
+  async function downloadPdf() {
+    try {
+      setStatus('Gerando PDF...')
+      const response = await fetch(qrImageUrl)
+      if (!response.ok) throw new Error('QR Code indisponivel')
+      const qrDataUrl = await blobToDataUrl(await response.blob())
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      pdf.setFillColor(248, 250, 252)
+      pdf.rect(0, 0, 210, 297, 'F')
+      pdf.setTextColor(15, 23, 42)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(24)
+      pdf.text('Barbearia Jacobina', 105, 55, { align: 'center' })
+      pdf.setFontSize(16)
+      pdf.text('Placa de atendimento', 105, 68, { align: 'center' })
+      pdf.addImage(qrDataUrl, 'PNG', 35, 82, 140, 140)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(13)
+      pdf.text('Escaneie com a camera do celular para fazer', 105, 242, { align: 'center' })
+      pdf.text('seu cadastro rapido na barbearia!', 105, 250, { align: 'center' })
+      pdf.save('placa-qrcode-barbearia.pdf')
+      setStatus('PDF baixado com sucesso.')
+    } catch {
+      setStatus('Nao foi possivel gerar o PDF.')
+    }
   }
+
 
   function printSignupCard() {
     const printWindow = window.open('', '_blank', 'width=720,height=900')
