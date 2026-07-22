@@ -14,5 +14,10 @@ export async function GET(request: Request) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
   const { data, error } = await supabase.from('servicos').select('id,nome,preco,duracao_minutos').eq('user_id', barbeariaId).eq('ativo', true).order('nome')
   if (error) return NextResponse.json({ error: 'Nao foi possivel carregar os servicos.' }, { status: 400 })
-  return NextResponse.json({ services: data ?? [] })
+  if (!data?.length) {
+    const defaults = [{ user_id: barbeariaId, nome: 'Corte', preco: 60, duracao_minutos: 30 }, { user_id: barbeariaId, nome: 'Barba', preco: 40, duracao_minutos: 30 }]
+    const created = await supabase.from('servicos').insert(defaults).select('id,nome,preco,duracao_minutos')
+    return NextResponse.json({ services: created.data ?? defaults.map((item) => ({ ...item, id: item.nome.toLowerCase() })) })
+  }
+  return NextResponse.json({ services: data })
 }
