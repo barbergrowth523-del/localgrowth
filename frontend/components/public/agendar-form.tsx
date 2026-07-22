@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { CalendarCheck, Check, Clock3, UserRound } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -36,7 +36,7 @@ export default function PublicBookingForm({ barbearia }: { barbearia: string }) 
     if (!services.length) { setMessage('Nenhum servico disponivel no momento.'); return }
     if (!selectedDate || !selectedTime) { setMessage('Escolha um dia e um horario para continuar.'); return }
     setLoading(true)
-    const response = await fetch('/api/agendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barbearia, nome, telefone, servicoId, date: selectedDate, time: selectedTime }) })
+    const response = await fetch('/api/agendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barbearia, nome, telefone, servicoId, servico: services.find((service) => service.id === servicoId)?.nome, date: selectedDate, time: selectedTime }) })
     const data = await response.json() as { success?: boolean; error?: string }
     if (!response.ok || !data.success) setMessage(data.error ?? 'Nao foi possivel criar o agendamento.')
     else setSuccess(true)
