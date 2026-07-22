@@ -1,0 +1,1 @@
+alter table public.perfis_barbearia add column if not exists plano text not null default 'starter' check (plano in ('starter', 'pro', 'scale'));

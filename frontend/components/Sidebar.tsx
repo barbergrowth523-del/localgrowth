@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, CalendarDays, CreditCard, LayoutDashboard, LogOut, Scissors, Settings, User, Users } from 'lucide-react'
+import { BarChart3, CalendarDays, CreditCard, LayoutDashboard, LogOut, Scissors, Settings, User, Users, UsersRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Meus Clientes', href: '/clientes', icon: Users },
   { name: 'Agenda', href: '/agenda', icon: CalendarDays },
+  { name: 'Minha Equipe', href: '/equipe', icon: UsersRound },
   { name: 'Relatorios', href: '/relatorios', icon: BarChart3 },
   { name: 'Assinatura', href: '/assinatura', icon: CreditCard },
   { name: 'Configuracoes', href: '/configuracoes', icon: Settings },
