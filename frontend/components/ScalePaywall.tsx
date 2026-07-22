@@ -5,31 +5,46 @@ import { Lock, LoaderCircle, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+type PlanResult = { plano?: string | null; plan?: string | null }
+
+async function readActivePlan(userId: string) {
+  const supabase = createClient()
+  const primary = await supabase
+    .from('perfis_barbearia')
+    .select('plano')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (!primary.error) return String((primary.data as PlanResult | null)?.plano ?? 'starter').toLowerCase()
+
+  const errorText = primary.error.message.toLowerCase()
+  const missingPlanColumn = primary.error.code === '42703' || errorText.includes('column') || errorText.includes('plano')
+  if (!missingPlanColumn) return 'starter'
+
+  const fallback = await supabase
+    .from('perfis_barbearia')
+    .select('plan')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (fallback.error) return 'starter'
+  return String((fallback.data as PlanResult | null)?.plan ?? 'starter').toLowerCase()
+}
+
 export function ScalePaywall({ children }: { children: React.ReactNode }) {
   const [plan, setPlan] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
+
     async function loadPlan() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        if (active) {
-          setPlan(null)
-          setLoading(false)
-        }
-        return
-      }
-
-      const { data } = await supabase
-        .from('perfis_barbearia')
-        .select('plano')
-        .eq('id', user.id)
-        .maybeSingle()
+      const nextPlan = user ? await readActivePlan(user.id) : 'starter'
 
       if (active) {
-        setPlan(String(data?.plano ?? 'starter').toLowerCase())
+        setPlan(nextPlan)
         setLoading(false)
       }
     }
@@ -40,9 +55,7 @@ export function ScalePaywall({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const isScale = plan === 'scale'
-
-  if (isScale) return <>{children}</>
+  if (plan === 'scale') return <>{children}</>
 
   return (
     <div className="relative overflow-hidden rounded-2xl">
