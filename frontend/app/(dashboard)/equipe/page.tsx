@@ -10,18 +10,23 @@ type TeamMember = {
   nome: string
   telefone: string | null
   comissao_percentual: number
+  email: string | null
   ativo: boolean
 }
 
 type TeamForm = {
   nome: string
   telefone: string
+  email: string
+  senha: string
   comissao: string
 }
 
 const emptyForm: TeamForm = {
   nome: '',
   telefone: '',
+  email: '',
+  senha: '',
   comissao: '50',
 }
 
@@ -48,7 +53,7 @@ export default function EquipePage() {
 
     const { data, error } = await supabase
       .from('equipe')
-      .select('id,nome,telefone,comissao_percentual,ativo')
+      .select('id,nome,telefone,email,comissao_percentual,ativo')
       .eq('user_id', user.id)
       .order('nome')
 
@@ -61,32 +66,30 @@ export default function EquipePage() {
     event.preventDefault()
     const commission = Number(form.comissao.replace(',', '.'))
 
-    if (!form.nome.trim() || !Number.isFinite(commission) || commission < 0 || commission > 100) {
-      setStatus('Informe nome e comissao entre 0 e 100.')
+    if (!form.nome.trim() || !form.email.trim() || form.senha.length < 6 || !Number.isFinite(commission) || commission < 0 || commission > 100) {
+      setStatus('Informe nome, email, senha com 6 caracteres e comissao entre 0 e 100.')
       return
     }
 
     setSaving(true)
     setStatus('')
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setStatus('Sua sessao expirou. Entre novamente.')
-      setSaving(false)
-      return
-    }
-
-    const { error } = await supabase.from('equipe').insert({
-      user_id: user.id,
-      nome: form.nome.trim(),
-      telefone: form.telefone.trim() || null,
-      comissao_percentual: commission,
+    const response = await fetch('/api/equipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: form.nome.trim(),
+        telefone: form.telefone.trim(),
+        email: form.email.trim().toLowerCase(),
+        senha: form.senha,
+        comissao: commission,
+      }),
     })
+    const data = await response.json() as { error?: string }
 
-    if (error) setStatus('Erro ao salvar profissional: ' + error.message)
+    if (!response.ok) setStatus(data.error ?? 'Erro ao criar acesso do profissional.')
     else {
       setForm(emptyForm)
-      setStatus('Profissional cadastrado com sucesso!')
+      setStatus('Profissional cadastrado com acesso liberado!')
       await loadMembers()
     }
     setSaving(false)
@@ -146,7 +149,7 @@ export default function EquipePage() {
               <form onSubmit={saveMember} className="space-y-4">
                 <label className="block text-sm text-slate-300">Nome completo<input required value={form.nome} onChange={(event) => setForm({ ...form, nome: event.target.value })} placeholder="Ex: Samuel Santos" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label>
                 <label className="block text-sm text-slate-300">Telefone<input type="tel" value={form.telefone} onChange={(event) => setForm({ ...form, telefone: event.target.value })} placeholder="(00) 00000-0000" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label>
-                <label className="block text-sm text-slate-300">Comissao (%)<input required min="0" max="100" step="0.01" type="number" value={form.comissao} onChange={(event) => setForm({ ...form, comissao: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none focus:border-emerald-500" /></label>
+                <label className="block text-sm text-slate-300">Email de Acesso<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="profissional@email.com" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Senha<input required minLength={6} type="password" value={form.senha} onChange={(event) => setForm({ ...form, senha: event.target.value })} placeholder="Minimo de 6 caracteres" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Comissao (%)<input required min="0" max="100" step="0.01" type="number" value={form.comissao} onChange={(event) => setForm({ ...form, comissao: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none focus:border-emerald-500" /></label>
                 <button disabled={saving} type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"><Plus className="h-4 w-4" />{saving ? 'Salvando...' : 'Cadastrar profissional'}</button>
               </form>
             </section>
@@ -160,7 +163,7 @@ export default function EquipePage() {
                 <UsersRound className="h-5 w-5 shrink-0 text-emerald-400" />
               </div>
 
-              {loading ? <p className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-500">Carregando equipe...</p> : members.length ? <div className="space-y-3">{members.map((member) => <article key={member.id} className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-semibold text-white">{member.nome}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-emerald-400" />{member.telefone || 'Telefone nao informado'}</span><span className="text-emerald-300">Comissao de {Number(member.comissao_percentual).toFixed(0)}%</span><span>{member.ativo ? 'Ativo' : 'Inativo'}</span></div></div><button type="button" onClick={() => void deleteMember(member)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10 sm:w-auto"><Trash2 className="h-3.5 w-3.5" /> Apagar</button></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-8 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-600" /><p className="mt-3 text-sm text-slate-400">Nenhum profissional cadastrado.</p></div>}
+              {loading ? <p className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-500">Carregando equipe...</p> : members.length ? <div className="space-y-3">{members.map((member) => <article key={member.id} className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-semibold text-white">{member.nome}</p><p className="mt-1 truncate text-xs text-slate-500">{member.email || 'Email nao informado'}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-emerald-400" />{member.telefone || 'Telefone nao informado'}</span><span className="text-emerald-300">Comissao de {Number(member.comissao_percentual).toFixed(0)}%</span><span>{member.ativo ? 'Ativo' : 'Inativo'}</span></div></div><button type="button" onClick={() => void deleteMember(member)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10 sm:w-auto"><Trash2 className="h-3.5 w-3.5" /> Apagar</button></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-8 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-600" /><p className="mt-3 text-sm text-slate-400">Nenhum profissional cadastrado.</p></div>}
             </section>
           </div>
         </ScalePaywall>

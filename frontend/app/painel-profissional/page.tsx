@@ -1,20 +1,76 @@
 'use client'
 
-import { CalendarDays, LogOut } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { BarChart3, CalendarDays, CheckCircle2, LogOut } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type Appointment = { id: string; cliente_id: string; data_agendamento: string; hora_agendamento: string; servico: string; status: string }
+type Appointment = { id: string; cliente_id: string; data_agendamento: string; hora_agendamento: string; servico: string; servico_id: string | null; status: string }
 type Client = { id: string; nome: string; telefone: string }
-type Payload = { member: { nome: string }; appointments: Appointment[]; clients: Client[] }
+type Service = { id: string; nome: string; preco: number }
+type Payload = {
+  member: { nome: string; comissao_percentual: number }
+  appointments: Appointment[]
+  clients: Client[]
+  services: Service[]
+}
 
 export default function ProfessionalPanelPage() {
   const [data, setData] = useState<Payload | null>(null)
   const [message, setMessage] = useState('Carregando agenda...')
-  useEffect(() => { fetch('/api/profissional/agenda').then(async (response) => { if (!response.ok) throw new Error('Acesso negado.') ; return response.json() as Promise<Payload> }).then(setData).catch((error: Error) => setMessage(error.message)) }, [])
+
+  useEffect(() => {
+    fetch('/api/profissional/agenda')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Acesso negado.')
+        return response.json() as Promise<Payload>
+      })
+      .then(setData)
+      .catch((error: Error) => setMessage(error.message))
+  }, [])
+
   const names = new Map((data?.clients ?? []).map((client) => [client.id, client.nome]))
-  async function signOut() { await createClient().auth.signOut(); window.location.href = '/login-profissional' }
-  if (!data) return <main className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">{message}</main>
-  return <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-10"><div className="mx-auto max-w-5xl"><header className="mb-8 flex items-center justify-between"><div><p className="text-sm text-emerald-400">Painel do profissional</p><h1 className="mt-2 flex items-center gap-3 text-3xl font-bold"><CalendarDays className="h-8 w-8 text-emerald-400" /> Ola, {data.member.nome}</h1><p className="mt-2 text-sm text-slate-400">Veja apenas seus atendimentos e sua agenda.</p></div><button type="button" onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-xl border border-slate-800 px-4 py-3 text-sm text-slate-300 hover:bg-slate-900"><LogOut className="h-4 w-4" /> Sair</button></header><section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">{data.appointments.length ? data.appointments.map((appointment) => <article key={appointment.id} className="flex flex-col gap-3 border-b border-slate-800 p-5 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-white">{names.get(appointment.cliente_id) ?? 'Cliente'}</p><p className="mt-1 text-sm text-slate-400">{appointment.data_agendamento} as {appointment.hora_agendamento.slice(0, 5)} - {appointment.servico}</p></div><span className="rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300">{appointment.status}</span></article>) : <p className="p-10 text-center text-sm text-slate-500">Nenhum atendimento marcado.</p>}</section></div></main>
+  const prices = useMemo(() => new Map((data?.services ?? []).map((service) => [service.id, Number(service.preco)])), [data?.services])
+  const completed = data?.appointments.filter((appointment) => appointment.status === 'Concluido') ?? []
+  const revenue = completed.reduce((total, appointment) => total + (appointment.servico_id ? prices.get(appointment.servico_id) ?? 0 : 0), 0)
+  const commission = revenue * (Number(data?.member.comissao_percentual ?? 0) / 100)
+
+  async function signOut() {
+    await createClient().auth.signOut()
+    window.location.href = '/login-profissional'
+  }
+
+  if (!data) return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-sm text-slate-400">{message}</main>
+
+  return (
+    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-10">
+      <div className="mx-auto max-w-5xl">
+        <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-emerald-400">Painel do profissional</p>
+            <h1 className="mt-2 flex items-center gap-3 text-2xl font-bold sm:text-3xl"><CalendarDays className="h-8 w-8 shrink-0 text-emerald-400" /> Ola, {data.member.nome}</h1>
+            <p className="mt-2 text-sm text-slate-400">Veja apenas sua agenda, faturamento e comissao.</p>
+          </div>
+          <button type="button" onClick={() => void signOut()} className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-800 px-4 py-3 text-sm text-slate-300 hover:bg-slate-900"><LogOut className="h-4 w-4" /> Sair</button>
+        </header>
+
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Metric icon={<CalendarDays className="h-5 w-5" />} label="Cortes concluidos" value={String(completed.length)} />
+          <Metric icon={<BarChart3 className="h-5 w-5" />} label="Faturamento" value={'R$ ' + revenue.toFixed(2).replace('.', ',')} />
+          <Metric icon={<CheckCircle2 className="h-5 w-5" />} label="Minha comissao" value={'R$ ' + commission.toFixed(2).replace('.', ',')} />
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+          <div className="border-b border-slate-800 p-5">
+            <h2 className="font-semibold text-white">Minha agenda</h2>
+            <p className="mt-1 text-xs text-slate-500">Atendimentos atribuidos somente a voce.</p>
+          </div>
+          {data.appointments.length ? <div className="divide-y divide-slate-800">{data.appointments.map((appointment) => <article key={appointment.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-semibold text-white">{names.get(appointment.cliente_id) ?? 'Cliente'}</p><p className="mt-1 text-sm text-slate-400">{appointment.data_agendamento} as {appointment.hora_agendamento.slice(0, 5)} - {appointment.servico}</p></div><span className="w-fit rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300">{appointment.status}</span></article>)}</div> : <p className="p-10 text-center text-sm text-slate-500">Nenhum atendimento marcado.</p>}
+        </section>
+      </div>
+    </main>
+  )
 }
 
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-xl"><div className="flex items-center gap-3 text-emerald-400">{icon}<span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span></div><p className="mt-4 text-2xl font-bold text-white">{value}</p></article>
+}
