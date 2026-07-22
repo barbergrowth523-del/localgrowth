@@ -41,6 +41,7 @@ export default function ClientesPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
+    setSignupUrl(window.location.origin + '/cadastrar?barbearia=' + user.id)
     const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
     if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return }
     if (!data?.length) { setClientes(initialClients); return }
