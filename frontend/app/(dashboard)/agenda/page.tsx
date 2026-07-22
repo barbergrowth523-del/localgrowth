@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, UserRound, X, XCircle } from 'lucide-react'
+import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, UserRound, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -16,7 +16,7 @@ type Appointment = {
   hora_agendamento: string
   servico: string
   status: Status
-  barbeiro_id?: string | null
+  equipe_id?: string | null
 }
 type FormState = { clienteId: string; date: string; time: string; serviceId: string; barberId: string }
 type CalendarCell = { date: string; day: number; currentMonth: boolean }
@@ -49,6 +49,7 @@ export default function AgendaPage() {
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const [reminderStatus, setReminderStatus] = useState('')
 
   useEffect(() => {
     void loadAgendaData()
@@ -90,7 +91,7 @@ export default function AgendaPage() {
         supabase.from('clientes').select('id,nome,telefone').eq('user_id', user.id).order('nome'),
         supabase.from('agendamentos').select('id,cliente_id,servico_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
         supabase.from('servicos').select('id,nome,preco,duracao_minutos').eq('user_id', user.id).eq('ativo', true).order('nome'),
-        supabase.from('barbeiros').select('id,nome').eq('user_id', user.id).eq('ativo', true).order('nome'),
+        supabase.from('equipe').select('id,nome').eq('user_id', user.id).eq('ativo', true).order('nome'),
       ])
 
       if (clientsResult.error) throw clientsResult.error
@@ -138,6 +139,13 @@ export default function AgendaPage() {
   const serviceNames = useMemo(() => new Map(services.map((service) => [service.id, service.nome])), [services])
   const barberNames = useMemo(() => new Map(barbers.map((barber) => [barber.id, barber.nome])), [barbers])
 
+  async function openReminders() {
+    const response = await fetch('/api/lembretes')
+    const data = await response.json() as { reminders?: Array<{ waLink: string }> }
+    if (!response.ok || !data.reminders?.length) { setReminderStatus('Nenhum lembrete pendente para amanha.'); return }
+    data.reminders.filter((item) => item.waLink).forEach((item) => window.open(item.waLink, '_blank', 'noopener,noreferrer'))
+    setReminderStatus(data.reminders.length + ' lembrete(s) aberto(s) no WhatsApp.')
+  }
   function changeMonth(offset: number) {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))
   }
@@ -176,7 +184,7 @@ export default function AgendaPage() {
       barbearia_id: user.id,
       cliente_id: form.clienteId,
       servico_id: form.serviceId,
-      barbeiro_id: form.barberId || null,
+      equipe_id: form.barberId || null,
       data_agendamento: form.date,
       hora_agendamento: form.time,
       servico: service?.nome ?? 'Servico',
@@ -206,6 +214,7 @@ export default function AgendaPage() {
       const { error } = await supabase.from('agendamentos').update({ status: nextStatus }).eq('id', appointment.id).eq('user_id', user.id)
       if (error) throw error
       setAppointments((current) => current.map((item) => item.id === appointment.id ? { ...item, status: nextStatus } : item))
+      setStatus(nextStatus === 'Concluido' ? 'Avaliacao pronta: /avaliar/' + appointment.id : '')
     } catch {
       setStatus('Nao foi possivel atualizar o status. Verifique a tabela agendamentos.')
     }
@@ -220,10 +229,10 @@ export default function AgendaPage() {
             <h1 className="mt-2 flex items-center gap-3 text-3xl font-bold"><CalendarDays className="h-8 w-8 text-emerald-400" /> Agenda</h1>
             <p className="mt-2 text-sm text-slate-400">Gerencie os cortes marcados e mantenha sua cadeira ocupada.</p>
           </div>
-          <button type="button" onClick={openModal} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"><Plus className="h-4 w-4" /> Novo agendamento</button>
+          <div className="flex flex-wrap gap-3"><button type="button" onClick={() => void openReminders()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 px-5 py-3 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/10"><Bell className="h-4 w-4" /> Lembretes de amanha</button><button type="button" onClick={openModal} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"><Plus className="h-4 w-4" /> Novo agendamento</button></div>
         </div>
 
-        {status && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status}</p>}
+        {(status || reminderStatus) && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status || reminderStatus}</p>}
         {!services.length && !loading && <p className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">Cadastre seus servicos em Configuracoes antes de criar um agendamento.</p>}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,1fr)]">
@@ -272,7 +281,7 @@ export default function AgendaPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="flex items-center gap-2 truncate text-base font-bold text-white"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs text-emerald-300">{(client?.nome ?? 'C').slice(0, 1).toUpperCase()}</span>{client?.nome ?? 'Cliente removido'}</p>
-                      <p className="mt-1 flex items-center gap-1 truncate text-xs text-slate-500"><UserRound className="h-3 w-3" />{serviceLabel} - {appointment.barbeiro_id ? barberNames.get(appointment.barbeiro_id) ?? 'Barbeiro' : 'Distribuicao automatica'}</p>
+                      <p className="mt-1 flex items-center gap-1 truncate text-xs text-slate-500"><UserRound className="h-3 w-3" />{serviceLabel} - {appointment.equipe_id ? barberNames.get(appointment.equipe_id) ?? 'Barbeiro' : 'Distribuicao automatica'}</p>
                     </div>
                   </div>
                   <button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="rounded-lg p-2 text-rose-300 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Cancelar agendamento"><XCircle className="h-4 w-4" /></button>

@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
   const [{ data: profile, error: profileError }, { data: barbers, error: barbersError }, { data: rows, error: appointmentsError }] = await Promise.all([
     supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle(),
-    supabase.from('barbeiros').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
+    supabase.from('equipe').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
     supabase.from('agendamentos').select('hora_agendamento').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('status', 'Confirmado'),
   ])
   if (profileError || barbersError || appointmentsError) {
@@ -74,6 +74,8 @@ export async function POST(request: Request) {
     hora_agendamento?: string
     barbeiroId?: string
     barbeiro_id?: string
+    equipeId?: string
+    equipe_id?: string
   }
 
   try {
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
   const servicoNome = (body.servico || '').trim()
   const date = (body.date || body.data || body.data_agendamento || '').trim()
   const time = (body.time || body.hora || body.hora_agendamento || '').trim()
-  const requestedBarberId = (body.barbeiroId || body.barbeiro_id || '').trim()
+  const requestedBarberId = (body.equipeId || body.equipe_id || body.barbeiroId || body.barbeiro_id || '').trim()
 
   if (!barbeariaId || !uuidPattern.test(barbeariaId)) return errorResponse('Link de agendamento invalido.', 'barbearia')
   if (nome.length < 2) return errorResponse('Informe um nome valido.', 'nome')
@@ -110,8 +112,8 @@ export async function POST(request: Request) {
 
   const [{ data: profile }, { data: activeBarbers, error: barbersError }, { data: occupiedRows, error: occupiedError }] = await Promise.all([
     supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle(),
-    supabase.from('barbeiros').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
-    supabase.from('agendamentos').select('barbeiro_id').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('hora_agendamento', time).eq('status', 'Confirmado'),
+    supabase.from('equipe').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
+    supabase.from('agendamentos').select('equipe_id,barbeiro_id').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('hora_agendamento', time).eq('status', 'Confirmado'),
   ])
   if (barbersError || occupiedError) {
     console.error('[api/agendar] capacity lookup failed', { barbersError, occupiedError, date, time })
@@ -125,11 +127,12 @@ export async function POST(request: Request) {
   if (activeBarbers?.length) {
     if (requestedBarberId) {
       if (!uuidPattern.test(requestedBarberId) || !activeBarbers.some((barber) => barber.id === requestedBarberId)) return errorResponse('Barbeiro invalido.', 'barbeiroId')
-      if ((occupiedRows ?? []).some((row) => row.barbeiro_id === requestedBarberId)) return errorResponse('Este barbeiro ja esta ocupado neste horario.', 'barbeiroId', 409)
+      if ((occupiedRows ?? []).some((row) => (row.equipe_id || row.barbeiro_id) === requestedBarberId)) return errorResponse('Este barbeiro ja esta ocupado neste horario.', 'barbeiroId', 409)
       assignedBarberId = requestedBarberId
     } else {
       const occupiedByBarber = new Map<string, number>()
-      ;(occupiedRows ?? []).forEach((row) => { if (row.barbeiro_id) occupiedByBarber.set(row.barbeiro_id, (occupiedByBarber.get(row.barbeiro_id) ?? 0) + 1) })
+      ;(occupiedRows ?? []).forEach((row) => { const occupiedId = row.equipe_id || row.barbeiro_id
+        if (occupiedId) occupiedByBarber.set(occupiedId, (occupiedByBarber.get(occupiedId) ?? 0) + 1) })
       const availableBarber = [...activeBarbers].sort((a, b) => (occupiedByBarber.get(a.id) ?? 0) - (occupiedByBarber.get(b.id) ?? 0)).find((barber) => !occupiedByBarber.get(barber.id))
       if (!availableBarber) return errorResponse('Nenhum barbeiro esta disponivel neste horario.', 'barbeiroId', 409)
       assignedBarberId = availableBarber.id
@@ -199,7 +202,7 @@ export async function POST(request: Request) {
       barbearia_id: barbeariaId,
       cliente_id: clientId,
       servico_id: service.id,
-      barbeiro_id: assignedBarberId,
+      equipe_id: assignedBarberId,
       servico: service.nome,
       data_agendamento: date,
       hora_agendamento: time,

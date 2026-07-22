@@ -85,7 +85,7 @@ export default function PublicBookingForm({ barbearia }: { barbearia: string }) 
     const response = await fetch('/api/agendar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ barbearia, nome, telefone, servicoId, barbeiroId: selectedBarberId || undefined, servico: services.find((service) => service.id === servicoId)?.nome, date: selectedDate, time: selectedTime }),
+      body: JSON.stringify({ barbearia, nome, telefone, servicoId, equipeId: selectedBarberId || undefined, servico: services.find((service) => service.id === servicoId)?.nome, date: selectedDate, time: selectedTime }),
     })
     const data = await response.json() as { success?: boolean; error?: string }
     if (!response.ok || !data.success) setMessage(data.error ?? 'Nao foi possivel criar o agendamento.')
