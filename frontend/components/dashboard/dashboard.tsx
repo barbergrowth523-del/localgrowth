@@ -37,8 +37,23 @@ function buildWhatsAppMessage(name: string) {
 export function Dashboard({ userEmail }: { userEmail: string }) {
   const displayName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Barbeiro').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
-  async function loadClients() { const supabase = createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return } const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true }); if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return } setClients((data ?? []).map(client => ({ id: client.id, name: client.nome, phone: client.telefone, last_cut_at: client.data_ultimo_corte, status_calculado: undefined, frequency: undefined, birthday: client.data_nascimento ?? undefined }))) }
-  useEffect(() => { void loadClients() }, [])
+  async function loadClients() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
+    const result = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+    let data = result.data as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }> | null
+    let error = result.error
+    const errorMessage = error?.message?.toLowerCase() ?? ''
+    if (error && (error.code === '42703' || (errorMessage.includes('data_nascimento') && errorMessage.includes('column')))) {
+      const fallback = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+      data = fallback.data as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }> | null
+      error = fallback.error
+    }
+    if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return }
+    const rows = (data ?? []) as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }>
+    setClients(rows.map(client => ({ id: client.id, name: client.nome, phone: client.telefone, last_cut_at: client.data_ultimo_corte, status_calculado: undefined, frequency: undefined, birthday: client.data_nascimento ?? undefined })))
+  }  useEffect(() => { void loadClients() }, [])
   const filteredClientes = useMemo(() => { const source = clients.length ? clients : sample; const normalizedSearch = searchTerm.trim().toLowerCase(); return source.filter(client => { const matchesSearch = (client.name + ' ' + client.phone).toLowerCase().includes(normalizedSearch); const normalizedFrequency = client.frequency?.toLowerCase(); const matchesFrequency = frequencyFilter === 'todos' || !normalizedFrequency || normalizedFrequency === frequencyFilter; return matchesSearch && matchesFrequency }) }, [clients, searchTerm, frequencyFilter])
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]

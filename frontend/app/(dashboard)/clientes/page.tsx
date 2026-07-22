@@ -51,12 +51,20 @@ export default function ClientesPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
-    const { data, error } = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+    const result = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+    let data = result.data as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }> | null
+    let error = result.error
+    const errorMessage = error?.message?.toLowerCase() ?? ''
+    if (error && (error.code === '42703' || (errorMessage.includes('data_nascimento') && errorMessage.includes('column')))) {
+      const fallback = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+      data = fallback.data as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }> | null
+      error = fallback.error
+    }
     if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return }
     if (!data?.length) { setClientes(initialClients); return }
-    setClientes(data.map((cliente) => ({ id: String(cliente.id), nome: cliente.nome, telefone: cliente.telefone, ultimoCorte: cliente.data_ultimo_corte, frequencia: 'mensal', novo: false, dataNascimento: cliente.data_nascimento ?? undefined })))
+    const rows = (data ?? []) as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }>
+    setClientes(rows.map((cliente) => ({ id: String(cliente.id), nome: cliente.nome, telefone: cliente.telefone, ultimoCorte: cliente.data_ultimo_corte, frequencia: 'mensal', novo: false, dataNascimento: cliente.data_nascimento ?? undefined })))
   }
-
   function closeModal() {
     setModalOpen(false)
     setForm({ nome: '', telefone: '', ultimoCorte: '', frequencia: 'mensal', novo: false, dataNascimento: '' })
