@@ -28,6 +28,31 @@ function errorResponse(message: string, field: string, status = 400) {
   return NextResponse.json({ error: message, field }, { status })
 }
 
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams
+  const ownerValue = params.get('barbearia')?.trim() ?? ''
+  const date = params.get('date')?.trim() ?? ''
+  const barbeariaId = resolveBarbeariaId(ownerValue)
+  if (!barbeariaId || !uuidPattern.test(barbeariaId)) return NextResponse.json({ error: 'Link de agendamento invalido.' }, { status: 400 })
+  if (!isRealDate(date)) return NextResponse.json({ error: 'Data invalida.', field: 'date' }, { status: 400 })
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ capacity: 1, booked: {} })
+
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
+  const [{ data: profile, error: profileError }, { data: rows, error: appointmentsError }] = await Promise.all([
+    supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle(),
+    supabase.from('agendamentos').select('hora_agendamento').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('status', 'Confirmado'),
+  ])
+  if (profileError || appointmentsError) {
+    console.error('[api/agendar] availability lookup failed', { profileError, appointmentsError, barbeariaId, date })
+    return NextResponse.json({ capacity: 1, booked: {} })
+  }
+  const booked: Record<string, number> = {}
+  ;(rows ?? []).forEach((row) => {
+    const time = String(row.hora_agendamento).slice(0, 5)
+    booked[time] = (booked[time] ?? 0) + 1
+  })
+  return NextResponse.json({ capacity: profile?.cadeiras_simultaneas ?? 1, booked })
+}
 export async function POST(request: Request) {
   let body: {
     barbearia?: string
@@ -79,6 +104,20 @@ export async function POST(request: Request) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
+  const { data: profile } = await supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle()
+  const capacity = profile?.cadeiras_simultaneas ?? 1
+  const { count: occupiedCount, error: occupiedError } = await supabase
+    .from('agendamentos')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', barbeariaId)
+    .eq('data_agendamento', date)
+    .eq('hora_agendamento', time)
+    .eq('status', 'Confirmado')
+  if (occupiedError) {
+    console.error('[api/agendar] capacity lookup failed', { code: occupiedError.code, message: occupiedError.message, date, time })
+    return errorResponse('Nao foi possivel validar a capacidade.', 'capacity', 500)
+  }
+  if ((occupiedCount ?? 0) >= capacity) return errorResponse('Este horario ja atingiu a capacidade da barbearia.', 'time', 409)
   let serviceQuery = supabase
     .from('servicos')
     .select('id,nome')
