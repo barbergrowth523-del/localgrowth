@@ -17,7 +17,7 @@ export async function GET() {
 
   const { data: appointments, error } = await supabase
     .from('agendamentos')
-    .select('id,cliente_id,data_agendamento,hora_agendamento,servico,status,servico_id')
+    .select('id,cliente_id,data_agendamento,hora_agendamento,servico,status,servico_id,nota_avaliacao')
     .eq('user_id', member.user_id)
     .eq('equipe_id', member.id)
     .order('data_agendamento')

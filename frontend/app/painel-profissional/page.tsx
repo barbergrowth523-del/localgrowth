@@ -1,10 +1,10 @@
 'use client'
 
-import { BarChart3, CalendarDays, CheckCircle2, LogOut, MessageCircle } from 'lucide-react'
+import { BarChart3, CalendarDays, CheckCircle2, LogOut, MessageCircle, Star } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type Appointment = { id: string; cliente_id: string; data_agendamento: string; hora_agendamento: string; servico: string; servico_id: string | null; status: string }
+type Appointment = { id: string; cliente_id: string; data_agendamento: string; hora_agendamento: string; servico: string; servico_id: string | null; status: string; nota_avaliacao: number | null }
 type Client = { id: string; nome: string; telefone: string }
 type Service = { id: string; nome: string; preco: number }
 type Payload = {
@@ -34,6 +34,8 @@ export default function ProfessionalPanelPage() {
   const completed = data?.appointments.filter((appointment) => appointment.status === 'Concluido') ?? []
   const revenue = completed.reduce((total, appointment) => total + (appointment.servico_id ? prices.get(appointment.servico_id) ?? 0 : 0), 0)
   const commission = revenue * (Number(data?.member.comissao_percentual ?? 0) / 100)
+  const rated = data?.appointments.filter((appointment) => appointment.nota_avaliacao) ?? []
+  const averageRating = rated.length ? rated.reduce((total, appointment) => total + Number(appointment.nota_avaliacao), 0) / rated.length : 0
 
   async function signOut() {
     await createClient().auth.signOut()
@@ -63,10 +65,11 @@ export default function ProfessionalPanelPage() {
           <button type="button" onClick={() => void signOut()} className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-800 px-4 py-3 text-sm text-slate-300 hover:bg-slate-900"><LogOut className="h-4 w-4" /> Sair</button>
         </header>
 
-        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Metric icon={<CalendarDays className="h-5 w-5" />} label="Cortes concluidos" value={String(completed.length)} />
           <Metric icon={<BarChart3 className="h-5 w-5" />} label="Faturamento" value={'R$ ' + revenue.toFixed(2).replace('.', ',')} />
           <Metric icon={<CheckCircle2 className="h-5 w-5" />} label="Minha comissao" value={'R$ ' + commission.toFixed(2).replace('.', ',')} />
+          <Metric icon={<Star className="h-5 w-5" />} label="Satisfacao media" value={averageRating ? averageRating.toFixed(1).replace('.', ',') + ' / 5' : 'Sem notas'} />
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
