@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight, Check, CheckCircle2, Copy, CreditCard, Lock, QrCode, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { ArrowRight, CalendarDays, Check, CheckCircle2, Copy, CreditCard, Lock, QrCode, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { FormEvent, useMemo, useState } from 'react'
 import { BRAND_NAME } from '@/lib/brand'
 
@@ -21,6 +21,7 @@ const initialForm: FormData = { name: '', email: '', cpfCnpj: '', cardNumber: ''
 export default function AssinaturaPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('pro')
   const [annual, setAnnual] = useState(false)
+  const [autoRenewal, setAutoRenewal] = useState(true)
   const [metodo, setMetodo] = useState<PaymentMethod>('PIX')
   const [loading, setLoading] = useState(false)
   const [pixInfo, setPixInfo] = useState<PixInfo | null>(null)
@@ -57,6 +58,23 @@ export default function AssinaturaPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
+      <section className="mb-8 rounded-2xl border border-emerald-500/30 bg-slate-900 p-5 shadow-xl shadow-emerald-500/5 md:p-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 p-2 text-emerald-400"><Sparkles className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><h2 className="mt-1 text-2xl font-bold text-white">Plano Pro Ativo</h2></div></div>
+            <p className="mt-3 text-sm text-slate-400">Seu acesso esta protegido e pronto para recuperar mais clientes.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><CalendarDays className="h-4 w-4 text-emerald-400" /><p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">Inicio</p><p className="mt-1 text-sm font-semibold text-white">23/06/2026</p></div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><CalendarDays className="h-4 w-4 text-emerald-400" /><p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">Proxima cobranca</p><p className="mt-1 text-sm font-semibold text-white">23/07/2026</p></div>
+            <div className="col-span-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 sm:col-span-1"><p className="text-[10px] uppercase tracking-wider text-slate-500">Tempo restante</p><p className="mt-1 text-sm font-semibold text-emerald-300">Faltam 12 dias</p><p className="mt-1 text-xs text-slate-500">para a renovacao</p></div>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3 lg:min-w-[190px] lg:flex-col lg:items-start">
+            <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-emerald-400" /><div><p className="text-xs font-semibold text-white">Renovacao automatica</p><p className="mt-1 text-[11px] text-slate-500">{autoRenewal ? 'Ativa' : 'Desativada'}</p></div></div>
+            <button type="button" onClick={() => setAutoRenewal((value) => !value)} aria-pressed={autoRenewal} aria-label="Alternar renovacao automatica" className={'relative h-6 w-11 rounded-full transition ' + (autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-1 h-4 w-4 rounded-full bg-white transition ' + (autoRenewal ? 'left-6' : 'left-1')} /></button>
+          </div>
+        </div>
+      </section>
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Sparkles className="h-8 w-8 text-emerald-400" /> Planos {BRAND_NAME}</h1><p className="mt-2 text-sm text-slate-400">Escolha o plano certo para recuperar mais clientes e aumentar seu faturamento.</p></div>
         <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3"><span className="text-sm text-slate-300">Cobranca anual</span><button type="button" onClick={() => setAnnual((value) => !value)} aria-pressed={annual} className={'relative h-6 w-11 rounded-full transition ' + (annual ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-1 h-4 w-4 rounded-full bg-white transition ' + (annual ? 'left-6' : 'left-1')} /></button><span className="text-xs font-bold text-emerald-400">2 meses gratis</span></div>
