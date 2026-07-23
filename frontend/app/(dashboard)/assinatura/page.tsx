@@ -2,6 +2,7 @@
 
 import { ArrowRight, CalendarDays, Check, CheckCircle2, Copy, CreditCard, Lock, QrCode, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { FormEvent, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { BRAND_NAME } from '@/lib/brand'
 
 type PaymentMethod = 'PIX' | 'CREDIT_CARD'
@@ -9,6 +10,7 @@ type PlanId = 'starter' | 'pro' | 'scale'
 type PixInfo = { encodedImage?: string; payload?: string }
 type FormData = { name: string; email: string; cpfCnpj: string; cardNumber: string; cardExpiryMonth: string; cardExpiryYear: string; cardCCV: string; holderName: string }
 type Plan = { id: PlanId; name: string; price: number; description: string; features: string[]; popular?: boolean }
+type SubscriptionInfo = { plan: string; startedAt: string; expiresAt: string; autoRenewal: boolean }
 
 const plans: Plan[] = [
   { id: 'starter', name: 'Plano Starter', price: 47, description: 'Para quem esta comecando a organizar a base.', features: ['Ate 150 clientes', 'QR Code de cadastro', 'Disparos manuais'] },
@@ -18,10 +20,32 @@ const plans: Plan[] = [
 
 const initialForm: FormData = { name: '', email: '', cpfCnpj: '', cardNumber: '', cardExpiryMonth: '', cardExpiryYear: '', cardCCV: '', holderName: '' }
 
+const formatPlanName = (value: string) => value ? 'Plano ' + value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : 'Plano nao informado'
+
+const formatDate = (value: string) => {
+  if (!value) return 'Nao informado'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Nao informado' : date.toLocaleDateString('pt-BR')
+}
+
+const getExpiryLabel = (value: string) => {
+  if (!value) return 'Validade nao informada'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Validade nao informada'
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const todayDate = new Date()
+  const today = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()).getTime()
+  const days = Math.ceil((target - today) / 86400000)
+  if (days === 0) return 'Vence hoje'
+  if (days < 0) return 'Vencido'
+  return 'Faltam ' + days + ' dias'
+}
+
 export default function AssinaturaPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('pro')
   const [annual, setAnnual] = useState(false)
-  const [autoRenewal, setAutoRenewal] = useState(true)
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
   const [metodo, setMetodo] = useState<PaymentMethod>('PIX')
   const [loading, setLoading] = useState(false)
   const [pixInfo, setPixInfo] = useState<PixInfo | null>(null)
@@ -33,6 +57,31 @@ export default function AssinaturaPage() {
   const price = annual ? plan.price * 10 : plan.price
   const monthlyEquivalent = annual ? plan.price * 10 / 12 : plan.price
   const update = (key: keyof FormData, value: string) => setFormData((current) => ({ ...current, [key]: value }))
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/assinatura')
+      .then(async (response) => {
+        const data = await response.json() as { subscription?: SubscriptionInfo; error?: string }
+        if (!response.ok) throw new Error(data.error ?? 'Nao foi possivel carregar a assinatura.')
+        if (active) setSubscription(data.subscription ?? null)
+      })
+      .catch((error) => { if (active) setMessage(error instanceof Error ? error.message : 'Nao foi possivel carregar a assinatura.') })
+      .finally(() => { if (active) setSubscriptionLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  async function toggleAutoRenewal() {
+    if (!subscription) return
+    const nextValue = !subscription.autoRenewal
+    setSubscription((current) => current ? { ...current, autoRenewal: nextValue } : current)
+    const response = await fetch('/api/assinatura', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoRenewal: nextValue }) })
+    if (!response.ok) {
+      setSubscription((current) => current ? { ...current, autoRenewal: !nextValue } : current)
+      setMessage('Nao foi possivel salvar a renovacao.')
+    }
+  }
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setMessage('')
@@ -58,21 +107,11 @@ export default function AssinaturaPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
-      <section className="mb-8 rounded-2xl border border-emerald-500/30 bg-slate-900 p-5 shadow-xl shadow-emerald-500/5 md:p-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 p-2 text-emerald-400"><Sparkles className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><h2 className="mt-1 text-2xl font-bold text-white">Plano Pro Ativo</h2></div></div>
-            <p className="mt-3 text-sm text-slate-400">Seu acesso esta protegido e pronto para recuperar mais clientes.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><CalendarDays className="h-4 w-4 text-emerald-400" /><p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">Inicio</p><p className="mt-1 text-sm font-semibold text-white">23/06/2026</p></div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><CalendarDays className="h-4 w-4 text-emerald-400" /><p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">Proxima cobranca</p><p className="mt-1 text-sm font-semibold text-white">23/07/2026</p></div>
-            <div className="col-span-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 sm:col-span-1"><p className="text-[10px] uppercase tracking-wider text-slate-500">Tempo restante</p><p className="mt-1 text-sm font-semibold text-emerald-300">Faltam 12 dias</p><p className="mt-1 text-xs text-slate-500">para a renovacao</p></div>
-          </div>
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3 lg:min-w-[190px] lg:flex-col lg:items-start">
-            <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-emerald-400" /><div><p className="text-xs font-semibold text-white">Renovacao automatica</p><p className="mt-1 text-[11px] text-slate-500">{autoRenewal ? 'Ativa' : 'Desativada'}</p></div></div>
-            <button type="button" onClick={() => setAutoRenewal((value) => !value)} aria-pressed={autoRenewal} aria-label="Alternar renovacao automatica" className={'relative h-6 w-11 rounded-full transition ' + (autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-1 h-4 w-4 rounded-full bg-white transition ' + (autoRenewal ? 'left-6' : 'left-1')} /></button>
-          </div>
+      <section className="mb-6 rounded-xl border border-emerald-500/25 bg-slate-900 px-4 py-3 shadow-lg shadow-emerald-500/5">
+        <div className="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 lg:min-w-[190px]"><Sparkles className="h-4 w-4 shrink-0 text-emerald-400" /><div><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><p className="font-bold text-white">{subscriptionLoading ? 'Carregando...' : formatPlanName(subscription?.plan ?? '') + (subscription?.plan ? ' Ativo' : '')}</p></div></div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs"><span><span className="text-slate-500">Inicio: </span><strong className="text-slate-200">{formatDate(subscription?.startedAt ?? '')}</strong></span><span><span className="text-slate-500">Vencimento: </span><strong className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-slate-200'}>{formatDate(subscription?.expiresAt ?? '')}</strong></span><span className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-emerald-300'}>{getExpiryLabel(subscription?.expiresAt ?? '')}</span></div>
+          <div className="flex items-center gap-3 lg:min-w-[210px] lg:justify-end"><div className="flex items-center gap-2"><RefreshCw className="h-3.5 w-3.5 text-emerald-400" /><span className="text-xs text-slate-400">Renovacao automatica</span></div><button type="button" disabled={!subscription || subscriptionLoading} onClick={toggleAutoRenewal} aria-pressed={subscription?.autoRenewal ?? false} aria-label="Alternar renovacao automatica" className={'relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ' + (subscription?.autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-0.5 h-4 w-4 rounded-full bg-white transition ' + (subscription?.autoRenewal ? 'left-4' : 'left-0.5')} /></button><span className="text-[10px] font-semibold text-slate-500">{subscription?.autoRenewal ? 'Ativa' : 'Desativada'}</span></div>
         </div>
       </section>
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
