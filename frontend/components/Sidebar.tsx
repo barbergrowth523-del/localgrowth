@@ -30,7 +30,7 @@ export default function Sidebar() {
     <>
       <aside className="hidden min-h-screen w-64 shrink-0 flex-col justify-between border-r border-slate-800 bg-slate-950 p-6 lg:flex">
         <div>
-          <div className="mb-10"><BrandLogo markClassName="h-10 w-10" nameClassName="text-lg tracking-wide" /></div>
+          <div className="mb-10 flex flex-col items-center justify-center p-4"><BrandLogo className="w-full" markClassName="h-auto w-full max-w-[180px]" /></div>
 
           <nav className="space-y-2">
             {menuItems.map((item) => {
