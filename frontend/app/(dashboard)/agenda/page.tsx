@@ -269,7 +269,9 @@ export default function AgendaPage() {
               const service = services.find((item) => item.id === appointment.servico_id)
               const phone = client?.telefone.replace(/\\D/g, '') ?? ''
               const whatsappPhone = phone.startsWith('55') ? phone : '55' + phone
-              const whatsappMessage = encodeURIComponent('Fala ' + (client?.nome.split(' ')[0] ?? 'cliente') + '! Seu horario esta confirmado. Se precisar falar com a barbearia, estamos por aqui.')
+              const isReminderReady = appointment.status === 'Confirmado' || appointment.data_agendamento === todayKey
+              const whatsappText = isReminderReady ? 'Ola ' + (client?.nome.split(' ')[0] ?? 'cliente') + ', passando para lembrar do nosso agendamento hoje as ' + appointment.hora_agendamento.slice(0, 5) + '. Te esperamos aqui na barbearia!' : 'Ola ' + (client?.nome.split(' ')[0] ?? 'cliente') + ', estamos por aqui caso precise falar sobre seu atendimento.'
+              const whatsappMessage = encodeURIComponent(whatsappText)
               const serviceLabel = service?.nome ?? appointment.servico
               const servicePrice = service ? 'R$ ' + Number(service.preco).toFixed(2).replace('.', ',') : 'Preco nao informado'
               return <article key={appointment.id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-lg shadow-emerald-950/10 transition hover:border-emerald-500/30">
@@ -292,7 +294,7 @@ export default function AgendaPage() {
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Telefone</p><p className="mt-1 truncate text-xs text-slate-400">{client?.telefone ?? 'Nao informado'}</p></div>
-                  {phone && <a href={'https://wa.me/' + whatsappPhone + '?text=' + whatsappMessage} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500 hover:text-slate-950"><MessageCircle className="h-3.5 w-3.5" /> Mensagem</a>}
+                  {phone && <a href={'https://wa.me/' + whatsappPhone + '?text=' + whatsappMessage} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500 hover:text-slate-950"><MessageCircle className="h-3.5 w-3.5" /> {isReminderReady ? 'Enviar WhatsApp' : 'Mensagem'}</a>}
                 </div>
                 <select aria-label="Status do agendamento" value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'mt-4 w-full rounded-lg border bg-slate-900 px-3 py-2.5 text-xs font-semibold outline-none transition ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 text-sky-300' : 'border-rose-500/20 text-rose-300')}><option>Confirmado</option><option>Concluido</option><option>Cancelado</option></select>
               </article>
