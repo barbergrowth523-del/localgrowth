@@ -170,14 +170,14 @@ function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () 
   const [generating, setGenerating] = useState(false)
   useEffect(() => {
     if (!client) return
-    setNote(window.localStorage.getItem('barbergrowth-note-' + client.id) ?? '')
+    setNote(window.localStorage.getItem('prontusfy-note-' + client.id) ?? '')
     setMessage(buildWhatsAppMessage(client.name))
     createClient().from('historico_disparos').select('id,mensagem_enviada,status,enviado_em').eq('cliente_id', client.id).order('enviado_em', { ascending: false }).then(({ data }) => setHistory((data ?? []) as Array<{ id: string; mensagem_enviada: string; status: string; enviado_em: string }>))
   }, [client])
   if (!client) return null
   const clientId = client.id
   const clientName = client.name
-  function saveNote() { window.localStorage.setItem('barbergrowth-note-' + clientId, note) }
+  function saveNote() { window.localStorage.setItem('prontusfy-note-' + clientId, note) }
   async function generateVariation(nextTone = tone) {
     setTone(nextTone)
     setGenerating(true)

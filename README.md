@@ -1,4 +1,4 @@
-# BarberGrowth
+# Prontusfy
 
 MVP em Next.js + Tailwind CSS + Supabase Auth/Data API.
 
