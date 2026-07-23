@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@/lib/brand'
 import { NextResponse } from 'next/server'
 
 const ASAAS_URL = process.env.ASAAS_API_URL ?? 'https://api.asaas.com/v3'
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       billingType,
       value,
       dueDate: new Date().toISOString().split('T')[0],
-      description: 'Assinatura Mensal - BarberGrowth',
+      description: 'Assinatura Mensal - ' + BRAND_NAME,
     }
 
     if (billingType === 'CREDIT_CARD') {

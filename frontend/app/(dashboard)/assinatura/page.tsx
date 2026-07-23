@@ -2,6 +2,7 @@
 
 import { ArrowRight, Check, CheckCircle2, Copy, CreditCard, Lock, QrCode, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { FormEvent, useMemo, useState } from 'react'
+import { BRAND_NAME } from '@/lib/brand'
 
 type PaymentMethod = 'PIX' | 'CREDIT_CARD'
 type PlanId = 'starter' | 'pro' | 'scale'
@@ -57,7 +58,7 @@ export default function AssinaturaPage() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Sparkles className="h-8 w-8 text-emerald-400" /> Planos BarberGrowth</h1><p className="mt-2 text-sm text-slate-400">Escolha o plano certo para recuperar mais clientes e aumentar seu faturamento.</p></div>
+        <div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Sparkles className="h-8 w-8 text-emerald-400" /> Planos {BRAND_NAME}</h1><p className="mt-2 text-sm text-slate-400">Escolha o plano certo para recuperar mais clientes e aumentar seu faturamento.</p></div>
         <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3"><span className="text-sm text-slate-300">Cobranca anual</span><button type="button" onClick={() => setAnnual((value) => !value)} aria-pressed={annual} className={'relative h-6 w-11 rounded-full transition ' + (annual ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-1 h-4 w-4 rounded-full bg-white transition ' + (annual ? 'left-6' : 'left-1')} /></button><span className="text-xs font-bold text-emerald-400">2 meses gratis</span></div>
       </div>
 
