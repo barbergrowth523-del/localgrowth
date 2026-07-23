@@ -13,6 +13,8 @@ type TeamMember = {
   email: string | null
   ativo: boolean
 }
+type Performance = { cortes: number; faturamento: number }
+
 
 type TeamForm = {
   nome: string
@@ -32,6 +34,7 @@ const emptyForm: TeamForm = {
 
 export default function EquipePage() {
   const [members, setMembers] = useState<TeamMember[]>([])
+  const [performance, setPerformance] = useState<Record<string, Performance>>({})
   const [form, setForm] = useState<TeamForm>(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -39,6 +42,7 @@ export default function EquipePage() {
 
   useEffect(() => {
     void loadMembers()
+    void loadPerformance()
   }, [])
 
   async function loadMembers() {
@@ -62,6 +66,18 @@ export default function EquipePage() {
     setLoading(false)
   }
 
+async function loadPerformance() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const [appointmentsResult, servicesResult] = await Promise.all([
+      supabase.from('agendamentos').select('equipe_id,servico_id,status').eq('user_id', user.id),
+      supabase.from('servicos').select('id,preco').eq('user_id', user.id),
+    ])
+    const prices = new Map((servicesResult.data ?? []).map((service) => [service.id, Number(service.preco)]))
+    const performance = new Map((appointmentsResult.data ?? []).map((appointment) => [appointment.equipe_id, appointment]))
+    return { prices, performance }
+  }
   async function saveMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const commission = Number(form.comissao.replace(',', '.'))
@@ -163,7 +179,7 @@ export default function EquipePage() {
                 <UsersRound className="h-5 w-5 shrink-0 text-emerald-400" />
               </div>
 
-              {loading ? <p className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-500">Carregando equipe...</p> : members.length ? <div className="space-y-3">{members.map((member) => <article key={member.id} className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-semibold text-white">{member.nome}</p><p className="mt-1 truncate text-xs text-slate-500">{member.email || 'Email nao informado'}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-emerald-400" />{member.telefone || 'Telefone nao informado'}</span><span className="text-emerald-300">Comissao de {Number(member.comissao_percentual).toFixed(0)}%</span><span>{member.ativo ? 'Ativo' : 'Inativo'}</span></div></div><button type="button" onClick={() => void deleteMember(member)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10 sm:w-auto"><Trash2 className="h-3.5 w-3.5" /> Apagar</button></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-8 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-600" /><p className="mt-3 text-sm text-slate-400">Nenhum profissional cadastrado.</p></div>}
+              {loading ? <p className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-sm text-slate-500">Carregando equipe...</p> : members.length ? <div className="space-y-3">{members.map((member) => <article key={member.id} className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-semibold text-white">{member.nome}</p><p className="mt-1 truncate text-xs text-slate-500">{member.email || 'Email nao informado'}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-emerald-400" />{member.telefone || 'Telefone nao informado'}</span><span className="text-emerald-300">Comissao de {Number(member.comissao_percentual).toFixed(0)}%</span><span>{member.ativo ? 'Ativo' : 'Inativo'}</span></div><div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-800 pt-3"><div><p className="text-[10px] uppercase tracking-wider text-slate-600">Cortes</p><p className="mt-1 text-sm font-bold text-white">{performance[member.id]?.cortes ?? 0}</p></div><div><p className="text-[10px] uppercase tracking-wider text-slate-600">Faturamento</p><p className="mt-1 text-sm font-bold text-emerald-300">R$ {(performance[member.id]?.faturamento ?? 0).toFixed(2).replace('.', ',')}</p></div><div><p className="text-[10px] uppercase tracking-wider text-slate-600">Comissao</p><p className="mt-1 text-sm font-bold text-white">R$ {((performance[member.id]?.faturamento ?? 0) * (Number(member.comissao_percentual) / 100)).toFixed(2).replace('.', ',')}</p></div></div></div><button type="button" onClick={() => void deleteMember(member)} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10 sm:w-auto"><Trash2 className="h-3.5 w-3.5" /> Apagar</button></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 p-8 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-600" /><p className="mt-3 text-sm text-slate-400">Nenhum profissional cadastrado.</p></div>}
             </section>
           </div>
         </ScalePaywall>

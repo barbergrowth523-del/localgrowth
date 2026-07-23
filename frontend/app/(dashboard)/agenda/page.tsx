@@ -4,7 +4,7 @@ import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCi
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type Status = 'Confirmado' | 'Concluido' | 'Cancelado'
+type Status = 'Confirmado' | 'Pendente' | 'Concluido' | 'Cancelado'
 type Service = { id: string; nome: string; preco: number; duracao_minutos: number }
 type Client = { id: string; nome: string; telefone: string }
 type Barber = { id: string; nome: string }
@@ -35,6 +35,12 @@ function dateKey(date: Date) {
 function displayDate(value: string) {
   const [year, month, day] = value.split('-')
   return day + '/' + month + '/' + year
+}
+function statusBadge(status: Status) {
+  if (status === 'Concluido') return 'border-sky-500/20 bg-sky-500/10 text-sky-300'
+  if (status === 'Cancelado') return 'border-rose-500/20 bg-rose-500/10 text-rose-300'
+  if (status === 'Pendente') return 'border-amber-500/20 bg-amber-500/10 text-amber-300'
+  return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
 }
 
 export default function AgendaPage() {
@@ -288,6 +294,7 @@ export default function AgendaPage() {
                   </div>
                   <button type="button" disabled={appointment.status === 'Cancelado'} onClick={() => void updateStatus(appointment, 'Cancelado')} className="rounded-lg p-2 text-rose-300 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Cancelar agendamento"><XCircle className="h-4 w-4" /></button>
                 </div>
+                <div className="mt-3"><span className={"inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider " + statusBadge(appointment.status)}>{appointment.status}</span></div>
                 <div className="mt-4 grid grid-cols-2 gap-3 border-y border-slate-800 py-3">
                   <div><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Servico</p><p className="mt-1 text-sm font-semibold text-slate-200">{serviceLabel}</p></div>
                   <div><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Valor</p><p className="mt-1 text-sm font-semibold text-emerald-300">{servicePrice}</p></div>
@@ -296,7 +303,7 @@ export default function AgendaPage() {
                   <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Telefone</p><p className="mt-1 truncate text-xs text-slate-400">{client?.telefone ?? 'Nao informado'}</p></div>
                   {phone && <a href={'https://wa.me/' + whatsappPhone + '?text=' + whatsappMessage} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500 hover:text-slate-950"><MessageCircle className="h-3.5 w-3.5" /> {isReminderReady ? 'Enviar WhatsApp' : 'Mensagem'}</a>}
                 </div>
-                <select aria-label="Status do agendamento" value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'mt-4 w-full rounded-lg border bg-slate-900 px-3 py-2.5 text-xs font-semibold outline-none transition ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 text-sky-300' : 'border-rose-500/20 text-rose-300')}><option>Confirmado</option><option>Concluido</option><option>Cancelado</option></select>
+                <select aria-label="Status do agendamento" value={appointment.status} onChange={(event) => void updateStatus(appointment, event.target.value as Status)} className={'mt-4 w-full rounded-lg border bg-slate-900 px-3 py-2.5 text-xs font-semibold outline-none transition ' + (appointment.status === 'Confirmado' ? 'border-emerald-500/20 text-emerald-300' : appointment.status === 'Concluido' ? 'border-sky-500/20 text-sky-300' : 'border-rose-500/20 text-rose-300')}><option>Confirmado</option><option>Pendente</option><option>Concluido</option><option>Cancelado</option></select>
               </article>
             })}</div> : <div className="p-10 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-950 text-slate-600"><Clock3 className="h-6 w-6" /></div><p className="mt-4 font-semibold text-slate-300">Nenhum horario marcado.</p><p className="mt-1 text-sm text-slate-500">Este dia esta livre para novos agendamentos.</p></div>}
           </section>
