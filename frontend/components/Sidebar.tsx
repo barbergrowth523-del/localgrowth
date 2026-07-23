@@ -28,11 +28,11 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="hidden min-h-screen w-64 shrink-0 flex-col justify-between border-r border-slate-800 bg-slate-950 p-6 lg:flex">
+      <aside className="hidden min-h-screen w-64 shrink-0 flex-col justify-between border-r border-slate-800 bg-slate-950 p-2 lg:flex">
         <div>
-          <div className="mb-4 flex flex-col items-center justify-center p-2"><BrandLogo className="w-full" markClassName="h-auto w-full max-w-[180px]" /></div>
+          <div className="mb-1 flex flex-col items-center justify-center p-0"><BrandLogo className="w-full" markClassName="h-auto w-full max-w-[180px]" /></div>
 
-          <nav className="space-y-2">
+          <nav className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
