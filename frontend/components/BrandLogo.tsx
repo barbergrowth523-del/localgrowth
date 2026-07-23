@@ -14,7 +14,7 @@ export default function BrandLogo({
   return (
     <span className={'inline-flex items-center justify-center ' + className}>
       <img
-        src="/Captura de tela 2026-07-23 070515.png"
+        src="/logo-prontusfy.png"
         alt="Prontusfy"
         className={'h-auto w-full max-w-[180px] object-contain drop-shadow-md ' + markClassName}
       />
