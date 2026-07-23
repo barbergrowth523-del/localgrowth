@@ -20,7 +20,10 @@ const plans: Plan[] = [
 
 const initialForm: FormData = { name: '', email: '', cpfCnpj: '', cardNumber: '', cardExpiryMonth: '', cardExpiryYear: '', cardCCV: '', holderName: '' }
 
-const formatPlanName = (value: string) => value ? 'Plano ' + value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : 'Plano nao informado'
+const formatPlanName = (value: string) => {
+  const cleanValue = value.replace(/^plano\s+/i, '').trim()
+  return cleanValue ? 'Plano ' + cleanValue.charAt(0).toUpperCase() + cleanValue.slice(1).toLowerCase() : 'Plano nao informado'
+}
 
 const formatDate = (value: string) => {
   if (!value) return 'Nao informado'
@@ -38,9 +41,22 @@ const getExpiryLabel = (value: string) => {
   const days = Math.ceil((target - today) / 86400000)
   if (days === 0) return 'Vence hoje'
   if (days < 0) return 'Vencido'
-  return 'Faltam ' + days + ' dias'
+  return 'Faltam ' + days + ' dias para a renovacao'
 }
 
+
+const getValidityProgress = (subscription: SubscriptionInfo | null) => {
+  if (!subscription?.startedAt || !subscription.expiresAt) return 0
+  const startedDate = new Date(subscription.startedAt)
+  const expiresDate = new Date(subscription.expiresAt)
+  if (Number.isNaN(startedDate.getTime()) || Number.isNaN(expiresDate.getTime())) return 0
+  const started = new Date(startedDate.getFullYear(), startedDate.getMonth(), startedDate.getDate()).getTime()
+  const expires = new Date(expiresDate.getFullYear(), expiresDate.getMonth(), expiresDate.getDate()).getTime()
+  const todayDate = new Date()
+  const today = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()).getTime()
+  if (expires <= started) return 0
+  return Math.max(0, Math.min(100, ((expires - today) / (expires - started)) * 100))
+}
 export default function AssinaturaPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('pro')
   const [annual, setAnnual] = useState(false)
@@ -56,6 +72,7 @@ export default function AssinaturaPage() {
   const plan = useMemo(() => plans.find((item) => item.id === selectedPlan) ?? plans[1], [selectedPlan])
   const price = annual ? plan.price * 10 : plan.price
   const monthlyEquivalent = annual ? plan.price * 10 / 12 : plan.price
+  const validityProgress = getValidityProgress(subscription)
   const update = (key: keyof FormData, value: string) => setFormData((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
@@ -107,18 +124,18 @@ export default function AssinaturaPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
-      <section className="mb-6 rounded-xl border border-emerald-500/25 bg-slate-900 px-4 py-3 shadow-lg shadow-emerald-500/5">
-        <div className="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-2 lg:min-w-[190px]"><Sparkles className="h-4 w-4 shrink-0 text-emerald-400" /><div><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><p className="font-bold text-white">{subscriptionLoading ? 'Carregando...' : formatPlanName(subscription?.plan ?? '') + (subscription?.plan ? ' Ativo' : '')}</p></div></div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs"><span><span className="text-slate-500">Inicio: </span><strong className="text-slate-200">{formatDate(subscription?.startedAt ?? '')}</strong></span><span><span className="text-slate-500">Vencimento: </span><strong className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-slate-200'}>{formatDate(subscription?.expiresAt ?? '')}</strong></span><span className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-emerald-300'}>{getExpiryLabel(subscription?.expiresAt ?? '')}</span></div>
-          <div className="flex items-center gap-3 lg:min-w-[210px] lg:justify-end"><div className="flex items-center gap-2"><RefreshCw className="h-3.5 w-3.5 text-emerald-400" /><span className="text-xs text-slate-400">Renovacao automatica</span></div><button type="button" disabled={!subscription || subscriptionLoading} onClick={toggleAutoRenewal} aria-pressed={subscription?.autoRenewal ?? false} aria-label="Alternar renovacao automatica" className={'relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ' + (subscription?.autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-0.5 h-4 w-4 rounded-full bg-white transition ' + (subscription?.autoRenewal ? 'left-4' : 'left-0.5')} /></button><span className="text-[10px] font-semibold text-slate-500">{subscription?.autoRenewal ? 'Ativa' : 'Desativada'}</span></div>
-        </div>
-      </section>
       <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Sparkles className="h-8 w-8 text-emerald-400" /> Planos {BRAND_NAME}</h1><p className="mt-2 text-sm text-slate-400">Escolha o plano certo para recuperar mais clientes e aumentar seu faturamento.</p></div>
         <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3"><span className="text-sm text-slate-300">Cobranca anual</span><button type="button" onClick={() => setAnnual((value) => !value)} aria-pressed={annual} className={'relative h-6 w-11 rounded-full transition ' + (annual ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-1 h-4 w-4 rounded-full bg-white transition ' + (annual ? 'left-6' : 'left-1')} /></button><span className="text-xs font-bold text-emerald-400">2 meses gratis</span></div>
       </div>
 
+      <section className="mb-6 rounded-xl border border-emerald-500/25 bg-slate-900 px-4 py-3 shadow-lg shadow-emerald-500/5">
+        <div className="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 lg:min-w-[190px]"><Sparkles className="h-4 w-4 shrink-0 text-emerald-400" /><div><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><p className="font-bold text-white">{subscriptionLoading ? 'Carregando...' : formatPlanName(subscription?.plan ?? '') + (subscription?.plan ? ' Ativo' : '')}</p></div></div>
+          <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-2 text-xs lg:px-5"><span><span className="text-slate-500">Inicio: </span><strong className="text-slate-200">{formatDate(subscription?.startedAt ?? '')}</strong></span><span><span className="text-slate-500">Vencimento: </span><strong className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-slate-200'}>{formatDate(subscription?.expiresAt ?? '')}</strong></span><div className="min-w-[170px] flex-1"><div className="mb-1 flex items-center justify-between gap-3"><span className="text-slate-500">Validade</span><span className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-emerald-300'}>{getExpiryLabel(subscription?.expiresAt ?? '')}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400 transition-all duration-500" style={{ width: validityProgress + '%' }} /></div></div></div>
+          <div className="flex items-center gap-3 lg:min-w-[210px] lg:justify-end"><div className="flex items-center gap-2"><RefreshCw className="h-3.5 w-3.5 text-emerald-400" /><span className="text-xs text-slate-400">Renovacao automatica</span></div><button type="button" disabled={!subscription || subscriptionLoading} onClick={toggleAutoRenewal} aria-pressed={subscription?.autoRenewal ?? false} aria-label="Alternar renovacao automatica" className={'relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ' + (subscription?.autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-0.5 h-4 w-4 rounded-full bg-white transition ' + (subscription?.autoRenewal ? 'left-4' : 'left-0.5')} /></button><span className="text-[10px] font-semibold text-slate-500">{subscription?.autoRenewal ? 'Ativa' : 'Desativada'}</span></div>
+        </div>
+      </section>
       <div className="mb-4 flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">Etapa 1</span><div><h2 className="text-sm font-bold text-white">Compare os planos</h2><p className="text-xs text-slate-500">Selecione o nivel ideal para sua operacao.</p></div></div><div className="mb-7 grid grid-cols-1 gap-4 md:grid-cols-3">
         {plans.map((item) => <button key={item.id} type="button" onClick={() => setSelectedPlan(item.id)} className={'relative text-left rounded-2xl border p-5 transition ' + (selectedPlan === item.id ? 'border-emerald-500 bg-emerald-500/10 shadow-xl shadow-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700')}>
           {item.popular && <span className="absolute -top-3 right-4 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-950">Mais Popular</span>}
