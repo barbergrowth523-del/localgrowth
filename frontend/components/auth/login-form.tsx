@@ -5,6 +5,8 @@ import { ArrowRight, Check, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 
+const SUPER_ADMIN_EMAIL = 'barbergrowth523@gmail.com'
+
 export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode)
   const [email, setEmail] = useState('')
@@ -23,7 +25,22 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
     setLoading(false)
     if (result.error) return setMessage(result.error.message)
     if (mode === 'signup') return setMessage('Confira seu e-mail para confirmar o cadastro.')
-    window.location.href = '/dashboard'
+    const user = result.data.user
+    const metadataRole = user?.app_metadata?.role
+    const normalizedEmail = user?.email?.trim().toLowerCase() ?? email.trim().toLowerCase()
+    let profileRole: string | null = null
+
+    if (user) {
+      const { data: profile } = await supabase
+        .from('perfis_barbearia')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      profileRole = typeof profile?.role === 'string' ? profile.role : null
+    }
+
+    const isAdmin = normalizedEmail === SUPER_ADMIN_EMAIL || metadataRole === 'admin' || profileRole === 'admin'
+    window.location.replace(isAdmin ? '/admin/dashboard' : '/dashboard')
   }
 
   return (
