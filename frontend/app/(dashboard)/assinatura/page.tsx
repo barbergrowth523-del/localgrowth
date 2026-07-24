@@ -97,6 +97,8 @@ export default function AssinaturaPage() {
   const validityProgress = getValidityProgress(subscription)
   const renewalCopy = getRenewalCopy(daysRemaining)
   const progressColor = getProgressColor(daysRemaining)
+  const currentPlan = subscription?.plan.trim().toLowerCase().replace(/^plano\s+/, '')
+  const hasPaidPlan = Boolean(currentPlan && currentPlan !== 'free' && currentPlan !== 'gratuito')
   const update = (key: keyof FormData, value: string) => setFormData((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
@@ -153,6 +155,7 @@ export default function AssinaturaPage() {
         <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3"><span className="text-sm text-slate-300">Cobranca anual</span><button type="button" onClick={() => setAnnual((value) => !value)} aria-pressed={annual} className={'relative h-6 w-11 rounded-full transition ' + (annual ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-1 h-4 w-4 rounded-full bg-white transition ' + (annual ? 'left-6' : 'left-1')} /></button><span className="text-xs font-bold text-emerald-400">2 meses gratis</span></div>
       </div>
 
+      {subscriptionLoading || hasPaidPlan ? (
       <section className="mb-6 rounded-xl border border-emerald-500/25 bg-slate-900 px-4 py-3 shadow-lg shadow-emerald-500/5">
         <div className="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2 lg:min-w-[190px]"><Sparkles className="h-4 w-4 shrink-0 text-emerald-400" /><div><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><p className="font-bold text-white">{subscriptionLoading ? 'Carregando...' : formatPlanName(subscription?.plan ?? '') + (subscription?.plan ? ' Ativo' : '')}</p></div></div>
@@ -160,7 +163,19 @@ export default function AssinaturaPage() {
           <div className="flex items-center gap-3 lg:min-w-[210px] lg:justify-end"><div className="flex items-center gap-2"><RefreshCw className="h-3.5 w-3.5 text-emerald-400" /><span className="text-xs text-slate-400">Renovacao automatica</span></div><button type="button" disabled={!subscription || subscriptionLoading} onClick={toggleAutoRenewal} aria-pressed={subscription?.autoRenewal ?? false} aria-label="Alternar renovacao automatica" className={'relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ' + (subscription?.autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-0.5 h-4 w-4 rounded-full bg-white transition ' + (subscription?.autoRenewal ? 'left-4' : 'left-0.5')} /></button><span className="text-[10px] font-semibold text-slate-500">{subscription?.autoRenewal ? 'Ativa' : 'Desativada'}</span></div>
         </div>
       </section>
-      <div className="mb-4 flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">Etapa 1</span><div><h2 className="text-sm font-bold text-white">Compare os planos</h2><p className="text-xs text-slate-500">Selecione o nivel ideal para sua operacao.</p></div></div><div className="mb-7 grid grid-cols-1 gap-4 md:grid-cols-3">
+      ) : (
+        <section className="mb-6 rounded-xl border border-emerald-400/30 bg-gradient-to-r from-emerald-500/10 via-slate-900 to-slate-900 px-4 py-4 shadow-lg shadow-emerald-500/10">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Plano Free</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Desbloqueie todo o potencial da sua barbearia.</h2>
+              <p className="mt-1 max-w-3xl text-sm text-slate-300">Ative o Plano Pro ou Scale para ter clientes ilimitados, resgate automatico no WhatsApp e painel financeiro avancado.</p>
+            </div>
+            <a href="#planos" className="inline-flex shrink-0 items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400">Ver planos</a>
+          </div>
+        </section>
+      )}
+      <div id="planos" className="mb-4 flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">Etapa 1</span><div><h2 className="text-sm font-bold text-white">Compare os planos</h2><p className="text-xs text-slate-500">Selecione o nivel ideal para sua operacao.</p></div></div><div className="mb-7 grid grid-cols-1 gap-4 md:grid-cols-3">
         {plans.map((item) => <button key={item.id} type="button" onClick={() => setSelectedPlan(item.id)} className={'relative text-left rounded-2xl border p-5 transition ' + (selectedPlan === item.id ? 'border-emerald-500 bg-emerald-500/10 shadow-xl shadow-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700')}>
           {item.popular && <span className="absolute -top-3 right-4 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-950">Mais Popular</span>}
           <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-bold text-white">{item.name}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p></div>{selectedPlan === item.id && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />}</div>
