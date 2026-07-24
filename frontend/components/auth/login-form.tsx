@@ -29,7 +29,7 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
   return (
     <AuthLayout
       aside={
-        <div className="mt-12">
+        <div className="mt-8">
           <p className="mb-4 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">Relacionamento que mant?m a cadeira cheia.</p>
           <h1 className="text-5xl font-semibold leading-[.98] tracking-[-.06em] text-white xl:text-6xl">Seu cliente n?o deveria precisar lembrar de voc?.</h1>
           <p className="mt-5 text-base leading-7 text-slate-400 xl:text-lg xl:leading-8">Organize seus clientes, entenda quem est? sumido e transforme uma mensagem em mais um hor?rio marcado.</p>

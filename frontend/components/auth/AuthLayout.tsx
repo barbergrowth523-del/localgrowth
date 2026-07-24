@@ -12,7 +12,7 @@ export function AuthLayout({ children, aside }: AuthLayoutProps) {
       <aside className="relative hidden w-1/2 flex-col justify-center overflow-hidden border-r border-slate-800 bg-slate-900 px-10 py-12 lg:flex xl:px-16">
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-[120%] w-[120%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/10 blur-[160px]" />
         <div className="relative z-10 mx-auto w-full max-w-2xl">
-          <BrandLogo className="mb-2" markClassName="h-16 w-auto max-w-[220px]" />
+          <BrandLogo markClassName="h-24 w-auto max-w-[300px]" />
           {aside}
         </div>
       </aside>
