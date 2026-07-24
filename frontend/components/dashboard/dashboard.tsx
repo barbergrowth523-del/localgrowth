@@ -37,13 +37,27 @@ function buildWhatsAppMessage(name: string) {
   return 'Oi, ' + name.split(' ')[0] + '! Tudo bem? Ja faz um tempinho desde seu ultimo corte. Quer reservar um horario?' + callToAction
 }
 export function Dashboard({ userEmail }: { userEmail: string }) {
-  const displayName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Barbeiro').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+  const fallbackName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Usuario').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+  const [profileName, setProfileName] = useState('')
+  const [planLabel, setPlanLabel] = useState('Plano Free')
+  const displayName = profileName || fallbackName
+  const firstName = displayName.split(' ')[0] || 'Usuario'
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
   async function loadClients() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
-    const result = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+    const primaryProfile = await supabase.from('perfis_barbearia').select('*').eq('id', user.id).maybeSingle()
+    const fallbackProfile = primaryProfile.data ? null : await supabase.from('perfis_barbearia').select('*').eq('auth_id', user.id).maybeSingle()
+    const profile = (primaryProfile.data ?? fallbackProfile?.data) as Record<string, unknown> | null
+    const profileValue = (keys: string[]) => keys.map((key) => profile?.[key]).find((value) => typeof value === 'string' && value.trim()) as string | undefined
+    const savedName = profileValue(['nome', 'nome_completo', 'name', 'nome_barbearia', 'barbearia_nome'])
+    const savedPlan = profileValue(['plano', 'plan', 'nome_plano'])
+    if (savedName) setProfileName(savedName.trim())
+    if (savedPlan) {
+      const cleanPlan = savedPlan.replace(/^plano\s+/i, '').trim()
+      setPlanLabel('Plano ' + (cleanPlan ? cleanPlan.charAt(0).toUpperCase() + cleanPlan.slice(1).toLowerCase() : 'Free'))
+    }    const result = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
     let data = result.data as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }> | null
     let error = result.error
     const errorMessage = error?.message?.toLowerCase() ?? ''
@@ -96,8 +110,8 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
   const atRisk = sumidoCount * 60
   const estimatedRecoveries = Math.min(sumidoCount, 2)
   const roiMultiple = estimatedRecoveries === 0 ? 0 : estimatedRecoveries
-  return <main className="min-h-screen bg-slate-950"><header className="border-b border-slate-800 bg-slate-950"><div className="mx-auto flex max-w-7xl items-center justify-end px-6 py-5 lg:px-10"><div className="flex items-center gap-3"><span className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300"><User size={15} className="text-emerald-400" />{displayName}</span></div></div></header>
-    <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 w-full"><div><p className="text-sm font-medium text-emerald-400">Visao geral</p><h1 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Bom dia, barbeiro.</h1><p className="mt-2 text-slate-400">Veja quem esta esperando por um novo corte.</p></div><div><input ref={fileRef} type="file" accept=".csv,text/csv" onChange={importCsv} className="hidden" /><button disabled={isUploading} onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"><FileUp size={17} /> {isUploading ? 'Importando...' : 'Importar planilha CSV'}</button></div></div>
+  return <main className="min-h-screen bg-slate-950"><header className="border-b border-slate-800 bg-slate-950"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-5 lg:px-10"><div className="flex min-w-0 items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"><Sparkles size={14} className="shrink-0 text-emerald-400" /><span className="truncate">{planLabel} Ativo</span></div><div className="flex items-center gap-3"><span className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300"><User size={15} className="text-emerald-400" />{displayName}</span></div></div></header>
+    <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 w-full"><div><p className="text-sm font-medium text-emerald-400">Visao geral</p><h1 className="mt-2 text-4xl font-semibold tracking-[-.05em]">Bom dia, {firstName}.</h1><p className="mt-2 text-slate-400">Veja quem esta esperando por um novo corte.</p></div><div><input ref={fileRef} type="file" accept=".csv,text/csv" onChange={importCsv} className="hidden" /><button disabled={isUploading} onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"><FileUp size={17} /> {isUploading ? 'Importando...' : 'Importar planilha CSV'}</button></div></div>
       {status && <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"><CheckCircle2 size={17} />{status}</div>}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"><MoneyOnTableCard value={atRisk} sumidoCount={sumidoCount} /><RoiBadge multiple={roiMultiple} recoveries={estimatedRecoveries} /><Stat icon={<Users size={18} />} label="Total de clientes" value={dashboardClients.length} /><Stat icon={<CalendarDays size={18} />} label="Cortes este mes" value={dashboardClients.filter(c => new Date(c.last_cut_at).getMonth() === new Date().getMonth()).length} /></div>
       <BirthdayPanel clients={dashboardClients} />
