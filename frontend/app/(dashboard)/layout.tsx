@@ -2,11 +2,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase/server'
+import { AuthProvider } from '@/components/auth/AuthProvider'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionClient = await createClient()
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) redirect('/login')
+
+  const profileResult = await sessionClient.from('perfis_barbearia').select('plano').eq('id', user.id).maybeSingle()
+  const profile = profileResult.data as { plano?: string | null } | null
+  const initialPlan = String(profile?.plano ?? 'starter').trim().toLowerCase().replace(/^plano\s+/, '') || 'starter'
+  const initialSubscriptionActive = initialPlan !== 'free' && initialPlan !== 'gratuito'
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const serviceClient = createAdminClient()
@@ -15,9 +21,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden bg-slate-950 text-white">
+    <AuthProvider initialUser={{ id: user.id, email: user.email }} initialPlan={initialPlan} initialSubscriptionActive={initialSubscriptionActive}>
+      <div className="flex min-h-screen overflow-x-hidden bg-slate-950 text-white">
       <Sidebar />
       <main className="min-w-0 flex-1 overflow-y-auto pb-24 lg:pb-0">{children}</main>
-    </div>
+      </div>
+    </AuthProvider>
   )
 }

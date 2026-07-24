@@ -1,61 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { Lock, LoaderCircle, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-
-type PlanResult = { plano?: string | null; plan?: string | null }
-
-async function readActivePlan(userId: string) {
-  const supabase = createClient()
-  const primary = await supabase
-    .from('perfis_barbearia')
-    .select('plano')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (!primary.error) return String((primary.data as PlanResult | null)?.plano ?? 'starter').toLowerCase()
-
-  const errorText = primary.error.message.toLowerCase()
-  const missingPlanColumn = primary.error.code === '42703' || errorText.includes('column') || errorText.includes('plano')
-  if (!missingPlanColumn) return 'starter'
-
-  const fallback = await supabase
-    .from('perfis_barbearia')
-    .select('plan')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (fallback.error) return 'starter'
-  return String((fallback.data as PlanResult | null)?.plan ?? 'starter').toLowerCase()
-}
+import { Lock, Sparkles } from 'lucide-react'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 export function ScalePaywall({ children }: { children: React.ReactNode }) {
-  const [plan, setPlan] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { permissions } = useAuth()
 
-  useEffect(() => {
-    let active = true
-
-    async function loadPlan() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      const nextPlan = user ? await readActivePlan(user.id) : 'starter'
-
-      if (active) {
-        setPlan(nextPlan)
-        setLoading(false)
-      }
-    }
-
-    void loadPlan()
-    return () => {
-      active = false
-    }
-  }, [])
-
-  if (plan === 'scale') return <>{children}</>
+  if (permissions.isScale) return <>{children}</>
 
   return (
     <div className="relative overflow-hidden rounded-2xl">
@@ -63,15 +15,13 @@ export function ScalePaywall({ children }: { children: React.ReactNode }) {
       <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-[2px] sm:p-6">
         <div className="w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-slate-950/95 p-5 text-center shadow-2xl shadow-emerald-950/40 sm:p-6">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-            {loading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5" />}
+            <Lock className="h-5 w-5" />
           </div>
           <div className="mt-4 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
             <Sparkles className="h-4 w-4" /> Plano Scale
           </div>
           <h2 className="mt-2 text-lg font-bold text-white sm:text-xl">Recurso exclusivo do Plano Scale</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            {loading ? 'Verificando seu plano...' : 'Ative o Plano Scale para liberar equipe, relatorios e recursos avancados.'}
-          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">Ative o Plano Scale para liberar equipe, relatorios e recursos avancados.</p>
           <Link href="/assinatura" className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400">
             Fazer upgrade
           </Link>
