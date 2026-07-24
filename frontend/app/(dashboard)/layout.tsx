@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase/server'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import { SupportChat } from '@/components/support/SupportChat'
+import { GlobalBroadcastBanner } from '@/components/dashboard/GlobalBroadcastBanner'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionClient = await createClient()
@@ -34,6 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar />
       <main className="min-w-0 flex-1 overflow-y-auto pb-24 lg:pb-0">{children}</main>
       </div>
+      <GlobalBroadcastBanner />
       <SupportChat />
     </AuthProvider>
   )

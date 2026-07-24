@@ -1,0 +1,26 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { BellRing, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+
+type Broadcast = { id: string; title: string; message: string; kind: 'info' | 'success' | 'warning' | 'critical' }
+const styles = { info: 'border-sky-500/30 bg-sky-500/10 text-sky-100', success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100', warning: 'border-amber-500/30 bg-amber-500/10 text-amber-100', critical: 'border-rose-500/30 bg-rose-500/10 text-rose-100' }
+
+export function GlobalBroadcastBanner() {
+  const [items, setItems] = useState<Broadcast[]>([])
+  const [hidden, setHidden] = useState<string[]>([])
+  useEffect(() => {
+    const supabase = createClient()
+    const load = async () => {
+      const { data } = await supabase.from('admin_broadcasts').select('id,title,message,kind').eq('status', 'published').order('published_at', { ascending: false }).limit(3)
+      setItems((data ?? []) as Broadcast[])
+    }
+    void load()
+    const channel = supabase.channel('merchant-broadcasts').on('postgres_changes', { event: '*', schema: 'public', table: 'admin_broadcasts' }, () => { void load() }).subscribe()
+    return () => { void supabase.removeChannel(channel) }
+  }, [])
+  const visible = items.filter((item) => !hidden.includes(item.id))
+  if (!visible.length) return null
+  return <div className="fixed inset-x-3 bottom-20 z-50 space-y-2 lg:bottom-5 lg:left-auto lg:right-5 lg:w-[420px]">{visible.map((item) => <aside key={item.id} role="status" className={`rounded-2xl border p-4 shadow-2xl backdrop-blur-xl ${styles[item.kind]}`}><div className="flex gap-3"><BellRing className="mt-0.5 h-5 w-5 shrink-0" /><div className="min-w-0 flex-1"><p className="font-bold">{item.title}</p><p className="mt-1 text-sm leading-6 opacity-90">{item.message}</p></div><button type="button" onClick={() => setHidden((current) => [...current, item.id])} className="shrink-0 opacity-70 transition hover:opacity-100" aria-label="Fechar comunicado"><X className="h-4 w-4" /></button></div></aside>)}</div>
+}

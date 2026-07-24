@@ -26,6 +26,9 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
     if (result.error) return setMessage(result.error.message)
     if (mode === 'signup') return setMessage('Confira seu e-mail para confirmar o cadastro.')
     const user = result.data.user
+    if (user) {
+      void supabase.from('account_activity_events').insert({ user_id: user.id, event_type: 'login' })
+    }
     const metadataRole = user?.app_metadata?.role
     const normalizedEmail = user?.email?.trim().toLowerCase() ?? email.trim().toLowerCase()
     let profileRole: string | null = null

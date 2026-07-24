@@ -3,10 +3,7 @@ import { getAdminErrorMessage, getAdminErrorStatus, requireSuperAdmin } from '@/
 import { getAdminOverview } from '@/lib/admin-overview'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-type AdminAction =
-  | { action: 'block'; userId: string; blocked: boolean }
-  | { action: 'courtesy'; userId: string; days: number }
-  | { action: 'impersonate'; userId: string }
+type AdminAction = { action?: string; userId?: string; blocked?: boolean; days?: number; ticketId?: string; status?: string; plan?: string }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -47,7 +44,7 @@ export async function PATCH(request: Request) {
 
   try {
     const { user: currentAdmin, admin } = await requireSuperAdmin()
-    const body = await request.json() as Partial<AdminAction>
+    const body = await request.json() as AdminAction
 
     if (!body.userId || !UUID_PATTERN.test(body.userId)) {
       return NextResponse.json({ error: 'Usuario alvo invalido.' }, { status: 400 })
@@ -99,6 +96,52 @@ export async function PATCH(request: Request) {
         courtesyUntil,
       })
       return NextResponse.json({ success: true, courtesyUntil })
+    }
+
+    if (body.action === 'change_plan' && ['starter', 'pro', 'scale'].includes(body.plan ?? '')) {
+      const previousPlan = targetProfile.plano
+      const { error } = await admin
+        .from('perfis_barbearia')
+        .update({ plano: body.plan })
+        .eq('id', body.userId)
+      if (error) throw error
+
+      await writeAudit(admin, currentAdmin.id, body.userId, 'change_plan', {
+        previousPlan,
+        newPlan: body.plan,
+      })
+      return NextResponse.json({ success: true, plan: body.plan })
+    }
+
+    if (
+      body.action === 'support_status'
+      && body.ticketId
+      && UUID_PATTERN.test(body.ticketId)
+      && ['aberto', 'em_atendimento', 'fechado'].includes(body.status ?? '')
+    ) {
+      const { data: ticket, error: ticketLookupError } = await admin
+        .from('support_tickets')
+        .select('id,user_id,status')
+        .eq('id', body.ticketId)
+        .eq('user_id', body.userId)
+        .maybeSingle()
+      if (ticketLookupError || !ticket) {
+        return NextResponse.json({ error: 'Chamado nao encontrado.' }, { status: 404 })
+      }
+
+      const { error } = await admin
+        .from('support_tickets')
+        .update({ status: body.status, updated_at: new Date().toISOString() })
+        .eq('id', body.ticketId)
+        .eq('user_id', body.userId)
+      if (error) throw error
+
+      await writeAudit(admin, currentAdmin.id, body.userId, 'update_support_status', {
+        ticketId: body.ticketId,
+        previousStatus: ticket.status,
+        newStatus: body.status,
+      })
+      return NextResponse.json({ success: true, status: body.status })
     }
 
     if (body.action === 'impersonate') {
