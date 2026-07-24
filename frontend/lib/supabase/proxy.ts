@@ -21,6 +21,22 @@ export async function updateSession(request: NextRequest) {
   const claims = claimsData?.claims
   const path = request.nextUrl.pathname
   const requiresOwnerSession = protectedOwnerRoutes.some((route) => path === route || path.startsWith(route + '/'))
+  const requiresAdminSession = path === '/admin' || path.startsWith('/admin/') || path === '/api/admin' || path.startsWith('/api/admin/')
+  const appMetadata = claims?.app_metadata as { role?: unknown } | undefined
+  const isAdminClaim = appMetadata?.role === 'admin'
+
+  if (!claims && requiresAdminSession) {
+    if (path.startsWith('/api/admin')) {
+      return NextResponse.json({ error: 'Sessao administrativa nao encontrada.' }, { status: 401 })
+    }
+    return NextResponse.redirect(new URL('/login?next=/admin/dashboard', request.url))
+  }
+  if (claims && requiresAdminSession && !isAdminClaim) {
+    if (path.startsWith('/api/admin')) {
+      return NextResponse.json({ error: 'Acesso administrativo negado.' }, { status: 403 })
+    }
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
   if (!claims && requiresOwnerSession) return NextResponse.redirect(new URL('/login', request.url))
   if (claims && (path === '/' || path === '/login' || path === '/cadastro')) return NextResponse.redirect(new URL('/dashboard', request.url))
   return response

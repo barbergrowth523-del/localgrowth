@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase/server'
 import { AuthProvider } from '@/components/auth/AuthProvider'
+import { SupportChat } from '@/components/support/SupportChat'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionClient = await createClient()
@@ -16,6 +17,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const serviceClient = createAdminClient()
+    const { data: account } = await serviceClient
+      .from('perfis_barbearia')
+      .select('acesso_bloqueado')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (account?.acesso_bloqueado === true) redirect('/conta-bloqueada')
+
     const { data: member } = await serviceClient.from('equipe').select('user_id').eq('auth_user_id', user.id).maybeSingle()
     if (member && member.user_id !== user.id) redirect('/painel-profissional')
   }
@@ -26,6 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar />
       <main className="min-w-0 flex-1 overflow-y-auto pb-24 lg:pb-0">{children}</main>
       </div>
+      <SupportChat />
     </AuthProvider>
   )
 }
