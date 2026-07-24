@@ -1,5 +1,6 @@
 ﻿import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { checkPublicRateLimit } from '@/lib/security/rate-limit'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
@@ -7,8 +8,7 @@ const timePattern = /^\d{2}:\d{2}$/
 const permanentBarbearias: Record<string, string | undefined> = { jacobina: process.env.BARBEARIA_JACOBINA_ID || 'a2ce084d-84bd-426e-9ec4-cc0f961df556' }
 
 function resolveBarbeariaId(value: string) {
-  const normalized = value.trim().toLowerCase()
-  return uuidPattern.test(value.trim()) ? value.trim() : permanentBarbearias[normalized]
+  return permanentBarbearias[value.trim().toLowerCase()]
 }
 
 function isRealDate(value: string) {
@@ -30,6 +30,10 @@ function errorResponse(message: string, field: string, status = 400) {
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams
+  const allowed = await checkPublicRateLimit(request, 'agendar:availability', 120, 60)
+  if (!allowed) {
+    return NextResponse.json({ error: 'Muitas consultas. Tente novamente em instantes.' }, { status: 429 })
+  }
   const ownerValue = params.get('barbearia')?.trim() ?? ''
   const date = params.get('date')?.trim() ?? ''
   const barbeariaId = resolveBarbeariaId(ownerValue)
@@ -55,6 +59,11 @@ export async function GET(request: Request) {
   return NextResponse.json({ capacity: profile?.cadeiras_simultaneas ?? 1, booked, barbers: barbers ?? [] })
 }
 export async function POST(request: Request) {
+  const allowed = await checkPublicRateLimit(request, 'agendar:create', 10, 600)
+  if (!allowed) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente novamente mais tarde.' }, { status: 429 })
+  }
+
   let body: {
     barbearia?: string
     user_id?: string
@@ -85,7 +94,7 @@ export async function POST(request: Request) {
     return errorResponse('Corpo da requisicao invalido.', 'body')
   }
 
-  const requestedOwner = body.barbearia || body.user_id || body.userId || ''
+  const requestedOwner = body.barbearia || ''
   const barbeariaId = resolveBarbeariaId(requestedOwner)
   const nome = (body.nome || body.name || '').trim()
   const telefone = (body.telefone || body.phone || '').replace(/\D/g, '')
@@ -96,8 +105,8 @@ export async function POST(request: Request) {
   const requestedBarberId = (body.equipeId || body.equipe_id || body.barbeiroId || body.barbeiro_id || '').trim()
 
   if (!barbeariaId || !uuidPattern.test(barbeariaId)) return errorResponse('Link de agendamento invalido.', 'barbearia')
-  if (nome.length < 2) return errorResponse('Informe um nome valido.', 'nome')
-  if (telefone.length < 8) return errorResponse('Informe um telefone valido.', 'telefone')
+  if (nome.length < 2 || nome.length > 120) return errorResponse('Informe um nome valido.', 'nome')
+  if (telefone.length < 8 || telefone.length > 15) return errorResponse('Informe um telefone valido.', 'telefone')
   if (!uuidPattern.test(servicoId) && !servicoNome) return errorResponse('Selecione um servico valido.', 'servicoId')
   if (!isRealDate(date)) return errorResponse('Selecione uma data valida.', 'date')
   if (!isValidTime(time)) return errorResponse('Selecione um horario valido.', 'time')
@@ -110,16 +119,26 @@ export async function POST(request: Request) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const [{ data: profile }, { data: activeBarbers, error: barbersError }, { data: occupiedRows, error: occupiedError }] = await Promise.all([
+  const weekday = new Date(date + 'T12:00:00').getDay()
+  const [{ data: profile }, { data: activeBarbers, error: barbersError }, { data: occupiedRows, error: occupiedError }, { data: schedule, error: scheduleError }] = await Promise.all([
     supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', barbeariaId).maybeSingle(),
     supabase.from('equipe').select('id,nome').eq('user_id', barbeariaId).eq('ativo', true).order('nome'),
     supabase.from('agendamentos').select('equipe_id,barbeiro_id').eq('user_id', barbeariaId).eq('data_agendamento', date).eq('hora_agendamento', time).eq('status', 'Confirmado'),
+    supabase.from('expedientes').select('aberto,hora_inicio,hora_fim').eq('user_id', barbeariaId).eq('dia_semana', weekday).maybeSingle(),
   ])
-  if (barbersError || occupiedError) {
+  if (barbersError || occupiedError || scheduleError) {
     console.error('[api/agendar] capacity lookup failed', { barbersError, occupiedError, date, time })
     return errorResponse('Nao foi possivel validar a capacidade.', 'capacity', 500)
   }
   const capacity = Math.min(profile?.cadeiras_simultaneas ?? 1, activeBarbers?.length || profile?.cadeiras_simultaneas || 1)
+  if (schedule) {
+    const startsAt = String(schedule.hora_inicio).slice(0, 5)
+    const endsAt = String(schedule.hora_fim).slice(0, 5)
+    if (!schedule.aberto || time < startsAt || time >= endsAt) {
+      return errorResponse('A barbearia nao atende neste dia ou horario.', 'time', 409)
+    }
+  }
+
   const occupiedCount = occupiedRows?.length ?? 0
   if (occupiedCount >= capacity) return errorResponse('Este horario ja atingiu a capacidade da barbearia.', 'time', 409)
 
@@ -156,69 +175,67 @@ export async function POST(request: Request) {
   }
   if (!service) return errorResponse('Servico nao encontrado para esta barbearia.', 'servicoId')
 
-  const existingClient = await supabase
+  const createdClient = await supabase
     .from('clientes')
+    .upsert({
+      nome,
+      telefone,
+      data_ultimo_corte: new Date().toISOString().slice(0, 10),
+      user_id: barbeariaId,
+      barbearia_id: barbeariaId,
+      servico_preferido_id: service.id,
+    }, { onConflict: 'user_id,telefone', ignoreDuplicates: true })
     .select('id')
-    .eq('user_id', barbeariaId)
-    .eq('telefone', telefone)
     .maybeSingle()
 
-  if (existingClient.error) {
-    console.error('[api/agendar] client lookup failed', { code: existingClient.error.code, message: existingClient.error.message, details: existingClient.error.details })
-    return errorResponse('Nao foi possivel consultar o cliente.', 'cliente', 500)
+  if (createdClient.error) {
+    console.error('[api/agendar] client insert failed', {
+      code: createdClient.error.code,
+      message: createdClient.error.message,
+      details: createdClient.error.details,
+      hint: createdClient.error.hint,
+    })
+    return errorResponse('Nao foi possivel cadastrar o cliente.', 'cliente', 500)
   }
 
-  let clientId = existingClient.data?.id
+  let clientId = createdClient.data?.id
   if (!clientId) {
-    const createdClient = await supabase
+    const existingClient = await supabase
       .from('clientes')
-      .insert({
-        nome,
-        telefone,
-        data_ultimo_corte: new Date().toISOString().slice(0, 10),
-        user_id: barbeariaId,
-        barbearia_id: barbeariaId,
-        servico_preferido_id: service.id,
-      })
       .select('id')
+      .eq('user_id', barbeariaId)
+      .eq('telefone', telefone)
       .single()
 
-    if (createdClient.error || !createdClient.data) {
-      console.error('[api/agendar] client insert failed', {
-        code: createdClient.error?.code,
-        message: createdClient.error?.message,
-        details: createdClient.error?.details,
-        hint: createdClient.error?.hint,
-      })
-      return errorResponse('Nao foi possivel cadastrar o cliente.', 'cliente', 500)
+    if (existingClient.error || !existingClient.data) {
+      return errorResponse('Nao foi possivel consultar o cliente.', 'cliente', 500)
     }
-    clientId = createdClient.data.id
+    clientId = existingClient.data.id
   }
 
   const appointment = await supabase
-    .from('agendamentos')
-    .insert({
-      user_id: barbeariaId,
-      barbearia_id: barbeariaId,
-      cliente_id: clientId,
-      servico_id: service.id,
-      equipe_id: assignedBarberId,
-      servico: service.nome,
-      data_agendamento: date,
-      hora_agendamento: time,
-      status: 'Confirmado',
+    .rpc('create_public_appointment', {
+      p_user_id: barbeariaId,
+      p_client_id: clientId,
+      p_service_id: service.id,
+      p_service_name: service.nome,
+      p_date: date,
+      p_time: time,
+      p_team_id: assignedBarberId,
     })
 
   if (appointment.error) {
-    console.error('[api/agendar] appointment insert failed', {
+    console.error('[api/agendar] atomic booking failed', {
       code: appointment.error.code,
       message: appointment.error.message,
-      details: appointment.error.details,
-      hint: appointment.error.hint,
-      payload: { barbeariaId, clientId, serviceId: service.id, date, time },
     })
+
+    const conflictMessages = ['slot_capacity_reached', 'team_member_unavailable', 'outside_business_hours']
+    if (appointment.error.code === '23505' || conflictMessages.some((message) => appointment.error.message.includes(message))) {
+      return errorResponse('Este horario nao esta mais disponivel.', 'time', 409)
+    }
     return errorResponse('Nao foi possivel reservar o horario.', 'agendamento', 500)
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, appointmentId: appointment.data }, { status: 201 })
 }

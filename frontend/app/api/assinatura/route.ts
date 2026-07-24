@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type Row = Record<string, unknown>
-type Source = { table: 'perfis_barbearia' | 'assinaturas'; key: string; id: string; row: Row }
+type Source = { table: 'perfis_barbearia'; key: 'id'; id: string; row: Row }
 
 const firstValue = (row: Row, keys: string[]) => keys.map((key) => row[key]).find((value) => value !== null && value !== undefined && value !== '')
 const addDays = (value: string, days: number) => {
@@ -27,28 +28,17 @@ const normalize = (profile: Row, subscription: Row | null, userCreatedAt: string
   }
 }
 
-async function findSubscription(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  for (const key of ['user_id', 'usuario_id', 'auth_id', 'perfil_id']) {
-    const result = await supabase.from('assinaturas').select('*').eq(key, userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    if (result.data) return result.data as Row
-  }
-  return null
-}
 
 async function getAccount() {
   const supabase = await createClient()
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError || !authData.user) return { supabase, user: null, profile: null, subscription: null, source: null, error: authError }
 
-  const primary = await supabase.from('perfis_barbearia').select('*').eq('id', authData.user.id).maybeSingle()
-  const fallback = primary.data ? null : await supabase.from('perfis_barbearia').select('*').eq('auth_id', authData.user.id).maybeSingle()
-  const profile = (primary.data ?? fallback?.data ?? null) as Row | null
-  const profileKey = profile && Object.prototype.hasOwnProperty.call(profile, 'id') ? 'id' : 'auth_id'
-  const profileSource = profile ? { table: 'perfis_barbearia' as const, key: profileKey, id: authData.user.id, row: profile } : null
-  const subscription = await findSubscription(supabase, authData.user.id)
-  const subscriptionSource = subscription && typeof subscription.id === 'string' ? { table: 'assinaturas' as const, key: 'id', id: subscription.id, row: subscription } : null
+  const primary = await supabase.from('perfis_barbearia').select('id,plano,data_inicio_assinatura,data_vencimento,renovacao_automatica,created_at').eq('id', authData.user.id).maybeSingle()
+  const profile = (primary.data ?? null) as Row | null
+  const profileSource = profile ? { table: 'perfis_barbearia' as const, key: 'id' as const, id: authData.user.id, row: profile } : null
 
-  return { supabase, user: authData.user, profile: profile ?? {}, subscription, source: subscriptionSource ?? profileSource, error: fallback?.error ?? primary.error }
+  return { supabase, user: authData.user, profile: profile ?? {}, subscription: null, source: profileSource, error: primary.error }
 }
 
 export async function GET() {
@@ -69,9 +59,10 @@ export async function PATCH(request: Request) {
   const column = ['renovacao_automatica', 'auto_renewal', 'renovacaoAutomatica', 'autoRenewal'].find((key) => Object.prototype.hasOwnProperty.call(sourceRow, key))
   if (!column) return NextResponse.json({ error: 'Campo de renovacao nao configurado no banco.' }, { status: 409 })
 
-  const { error } = await result.supabase.from(result.source.table).update({ [column]: body.autoRenewal }).eq(result.source.key, result.source.id)
+  const admin = createAdminClient()
+  const { error } = await admin.from(result.source.table).update({ [column]: body.autoRenewal }).eq(result.source.key, result.source.id)
   if (error) return NextResponse.json({ error: 'Nao foi possivel salvar a renovacao.' }, { status: 500 })
 
-  const updated = { ...sourceRow, [column]: body.autoRenewal }
-  return NextResponse.json({ subscription: normalize(result.profile ?? {}, result.subscription ? updated : null, result.user.created_at, result.source) })
+  const updatedProfile = { ...(result.profile ?? {}), [column]: body.autoRenewal }
+  return NextResponse.json({ subscription: normalize(updatedProfile, null, result.user.created_at, result.source) })
 }

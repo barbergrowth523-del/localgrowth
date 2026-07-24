@@ -3,7 +3,6 @@
 import { Clipboard, Copy, Download, MessageCircle, Plus, Printer, QrCode, Search, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { jsPDF } from 'jspdf'
 
 type Frequency = 'semanal' | 'quinzenal' | 'mensal'
 type Client = { id: string; nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean; dataNascimento?: string }
@@ -123,6 +122,7 @@ export default function ClientesPage() {
 
   async function downloadPdf() {
     try {
+      const { jsPDF } = await import('jspdf')
       setStatus('Gerando PDF...')
       const response = await fetch(qrImageUrl)
       if (!response.ok) throw new Error('QR Code indisponivel')
@@ -150,12 +150,20 @@ export default function ClientesPage() {
 
 
   function printSignupCard() {
-    const printWindow = window.open('', '_blank', 'width=720,height=900')
-    if (!printWindow) return
-    printWindow.document.write('<!doctype html><html><head><title>Impressao da placa</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;font-family:Arial,sans-serif;color:#0f172a}.card{width:620px;padding:56px 48px;text-align:center;border:1px solid #e2e8f0;border-radius:24px}.brand{font-size:28px;font-weight:800;letter-spacing:.04em;margin-bottom:12px}.title{font-size:22px;font-weight:700;margin:0 0 28px}.qr{width:520px;height:520px;object-fit:contain;margin:0 auto 28px}.instruction{font-size:18px;line-height:1.5;margin:0;color:#334155}@media print{.card{border:0;width:100%}}</style></head><body><main class="card"><div class="brand">Barbearia Jacobina</div><h1 class="title">Cadastro rapido de clientes</h1><img class="qr" src="' + qrImageUrl + '" alt="QR Code de cadastro" /><p class="instruction">Escaneie com a camera do celular para fazer seu cadastro rapido na barbearia!</p></main></body></html>')
-    printWindow.document.close()
-    printWindow.focus()
-    printWindow.onload = () => { printWindow.print(); printWindow.close() }
+    const safeQrUrl = qrImageUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const html = '<!doctype html><html><head><title>Impressao da placa</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;font-family:Arial,sans-serif;color:#0f172a}.card{width:620px;padding:56px 48px;text-align:center;border:1px solid #e2e8f0;border-radius:24px}.brand{font-size:28px;font-weight:800;letter-spacing:.04em;margin-bottom:12px}.title{font-size:22px;font-weight:700;margin:0 0 28px}.qr{width:520px;height:520px;object-fit:contain;margin:0 auto 28px}.instruction{font-size:18px;line-height:1.5;margin:0;color:#334155}@media print{.card{border:0;width:100%}}</style></head><body><main class="card"><div class="brand">Barbearia Jacobina</div><h1 class="title">Cadastro rapido de clientes</h1><img class="qr" src="' + safeQrUrl + '" alt="QR Code de cadastro" /><p class="instruction">Escaneie com a camera do celular para fazer seu cadastro rapido na barbearia!</p></main></body></html>'
+    const printUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+    const printWindow = window.open(printUrl, '_blank', 'width=720,height=900')
+    if (!printWindow) {
+      URL.revokeObjectURL(printUrl)
+      return
+    }
+    printWindow.onload = () => {
+      URL.revokeObjectURL(printUrl)
+      printWindow.focus()
+      printWindow.print()
+      printWindow.close()
+    }
   }
 
   function openWhatsApp(cliente: Client) {

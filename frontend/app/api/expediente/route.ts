@@ -12,7 +12,7 @@ const defaultSchedule = [
   { dia_semana: 5, aberto: true, hora_inicio: '09:00', hora_fim: '19:00' },
   { dia_semana: 6, aberto: true, hora_inicio: '08:00', hora_fim: '17:00' },
 ]
-function resolveBarbeariaId(value: string) { return uuidPattern.test(value) ? value : permanentBarbearias[value.toLowerCase()] }
+function resolveBarbeariaId(value: string) { return permanentBarbearias[value.trim().toLowerCase()] }
 
 export async function GET(request: Request) {
   const value = new URL(request.url).searchParams.get('barbearia')?.trim() ?? ''

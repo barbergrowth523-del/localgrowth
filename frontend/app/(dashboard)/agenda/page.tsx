@@ -10,6 +10,7 @@ type Client = { id: string; nome: string; telefone: string }
 type Barber = { id: string; nome: string }
 type Appointment = {
   id: string
+  avaliacao_token: string
   cliente_id: string
   servico_id?: string | null
   data_agendamento: string
@@ -64,9 +65,9 @@ export default function AgendaPage() {
   useEffect(() => {
     let channel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null
     let active = true
+    const supabase = createClient()
 
     async function subscribe() {
-      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user || !active) return
       channel = supabase
@@ -80,7 +81,7 @@ export default function AgendaPage() {
     void subscribe()
     return () => {
       active = false
-      if (channel) void createClient().removeChannel(channel)
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [])
 
@@ -95,7 +96,7 @@ export default function AgendaPage() {
 
       const [clientsResult, appointmentsResult, servicesResult, barbersResult] = await Promise.all([
         supabase.from('clientes').select('id,nome,telefone').eq('user_id', user.id).order('nome'),
-        supabase.from('agendamentos').select('id,cliente_id,servico_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
+        supabase.from('agendamentos').select('id,avaliacao_token,cliente_id,servico_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
         supabase.from('servicos').select('id,nome,preco,duracao_minutos').eq('user_id', user.id).eq('ativo', true).order('nome'),
         supabase.from('equipe').select('id,nome').eq('user_id', user.id).eq('ativo', true).order('nome'),
       ])
@@ -220,7 +221,7 @@ export default function AgendaPage() {
       const { error } = await supabase.from('agendamentos').update({ status: nextStatus }).eq('id', appointment.id).eq('user_id', user.id)
       if (error) throw error
       setAppointments((current) => current.map((item) => item.id === appointment.id ? { ...item, status: nextStatus } : item))
-      setStatus(nextStatus === 'Concluido' ? 'Avaliacao pronta: /avaliar/' + appointment.id : '')
+      setStatus(nextStatus === 'Concluido' ? 'Avaliacao pronta: /avaliar/' + appointment.avaliacao_token : '')
     } catch {
       setStatus('Nao foi possivel atualizar o status. Verifique a tabela agendamentos.')
     }

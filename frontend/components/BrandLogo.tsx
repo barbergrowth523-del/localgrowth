@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 type BrandLogoProps = {
   showName?: boolean
   className?: string
@@ -13,10 +14,13 @@ export default function BrandLogo({
 }: BrandLogoProps) {
   return (
     <span className={'inline-flex items-center justify-center ' + className}>
-      <img
+      <Image
         src="/logo-prontusfy.png"
+        width={180}
+        height={64}
+        priority
         alt="Prontusfy"
-        className={'h-auto w-full max-w-[180px] object-contain drop-shadow-md ' + markClassName}
+        className={'object-contain drop-shadow-md ' + markClassName}
       />
     </span>
   )

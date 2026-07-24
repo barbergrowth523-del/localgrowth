@@ -1,0 +1,14 @@
+alter table public.agendamentos drop constraint if exists agendamentos_status_check;
+alter table public.agendamentos add constraint agendamentos_status_check check (status in ('Confirmado','Pendente','Concluido','Cancelado'));
+alter table public.perfis_barbearia drop constraint if exists perfis_barbearia_cadeiras_check;
+alter table public.perfis_barbearia add constraint perfis_barbearia_cadeiras_check check (cadeiras_simultaneas between 1 and 100);
+alter table public.clientes drop constraint if exists clientes_nome_tamanho_check;
+alter table public.clientes add constraint clientes_nome_tamanho_check check (char_length(btrim(nome)) between 2 and 120);
+alter table public.clientes drop constraint if exists clientes_telefone_tamanho_check;
+alter table public.clientes add constraint clientes_telefone_tamanho_check check (char_length(regexp_replace(telefone,'\D','','g')) between 8 and 15);
+alter table public.servicos drop constraint if exists servicos_preco_check;
+alter table public.servicos add constraint servicos_preco_check check (preco >= 0);
+alter table public.servicos drop constraint if exists servicos_duracao_check;
+alter table public.servicos add constraint servicos_duracao_check check (duracao_minutos between 5 and 480);
+alter table public.equipe drop constraint if exists equipe_comissao_check;
+alter table public.equipe add constraint equipe_comissao_check check (comissao_percentual between 0 and 100);

@@ -48,11 +48,10 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
-    const primaryProfile = await supabase.from('perfis_barbearia').select('*').eq('id', user.id).maybeSingle()
-    const fallbackProfile = primaryProfile.data ? null : await supabase.from('perfis_barbearia').select('*').eq('auth_id', user.id).maybeSingle()
-    const profile = (primaryProfile.data ?? fallbackProfile?.data) as Record<string, unknown> | null
+    const primaryProfile = await supabase.from('perfis_barbearia').select('nome_estabelecimento,plano').eq('id', user.id).maybeSingle()
+    const profile = primaryProfile.data as Record<string, unknown> | null
     const profileValue = (keys: string[]) => keys.map((key) => profile?.[key]).find((value) => typeof value === 'string' && value.trim()) as string | undefined
-    const savedName = profileValue(['nome', 'nome_completo', 'name', 'nome_barbearia', 'barbearia_nome'])
+    const savedName = profileValue(['nome_estabelecimento', 'nome', 'nome_completo', 'name', 'nome_barbearia', 'barbearia_nome'])
     const savedPlan = profileValue(['plano', 'plan', 'nome_plano'])
     if (savedName) setProfileName(savedName.trim())
     if (savedPlan) {
