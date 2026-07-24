@@ -5,15 +5,24 @@ type Row = Record<string, unknown>
 type Source = { table: 'perfis_barbearia' | 'assinaturas'; key: string; id: string; row: Row }
 
 const firstValue = (row: Row, keys: string[]) => keys.map((key) => row[key]).find((value) => value !== null && value !== undefined && value !== '')
+const addDays = (value: string, days: number) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() + days)
+  return date.toISOString()
+}
 
 const normalize = (profile: Row, subscription: Row | null, userCreatedAt: string, source: Source | null) => {
   const merged = { ...profile, ...(subscription ?? {}) }
   const renewalValue = firstValue(merged, ['renovacao_automatica', 'auto_renewal', 'renovacaoAutomatica', 'autoRenewal'])
+  const startedAt = String(firstValue(merged, ['data_inicio_assinatura', 'inicio_assinatura', 'subscription_started_at', 'started_at', 'startDate', 'start_date', 'created_at']) ?? userCreatedAt ?? '')
+  const storedExpiresAt = firstValue(merged, ['data_vencimento', 'data_fim_assinatura', 'vencimento', 'subscription_ends_at', 'expires_at', 'expiresAt', 'due_date', 'dueDate'])
+  const expiresAt = String(storedExpiresAt ?? '') || addDays(startedAt, 30)
   return {
     plan: String(firstValue(merged, ['plano', 'plan', 'nome_plano', 'plan_name', 'subscription_plan']) ?? ''),
-    startedAt: String(firstValue(merged, ['data_inicio_assinatura', 'inicio_assinatura', 'subscription_started_at', 'started_at', 'startDate', 'start_date', 'created_at']) ?? userCreatedAt ?? ''),
-    expiresAt: String(firstValue(merged, ['data_fim_assinatura', 'data_vencimento', 'vencimento', 'subscription_ends_at', 'expires_at', 'expiresAt', 'due_date', 'dueDate']) ?? ''),
-    autoRenewal: renewalValue === true || renewalValue === 'true' || renewalValue === 1,
+    startedAt,
+    expiresAt,
+    autoRenewal: renewalValue === undefined || renewalValue === true || renewalValue === 'true' || renewalValue === 1,
     source,
   }
 }
