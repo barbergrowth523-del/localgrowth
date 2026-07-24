@@ -45,6 +45,27 @@ const getExpiryLabel = (value: string) => {
 }
 
 
+const getDaysRemaining = (value: string) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const todayDate = new Date()
+  const today = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()).getTime()
+  return Math.ceil((target - today) / 86400000)
+}
+
+const getRenewalCopy = (days: number | null) => {
+  if (days !== null && days > 10) return 'Seu negocio esta operando a todo vapor com suporte ativo.'
+  if (days !== null && days >= 4) return 'Faltam ' + days + ' dias para a renovacao. Mantenha sua operacao sem interrupcoes.'
+  return 'Seu plano esta prestes a encerrar. Ative a renovacao automatica para nao perder o acesso!'
+}
+
+const getProgressColor = (days: number | null) => {
+  if (days === null || days > 10) return 'bg-emerald-500'
+  if (days >= 4) return 'bg-amber-500'
+  return 'bg-rose-500'
+}
 const getValidityProgress = (subscription: SubscriptionInfo | null) => {
   if (!subscription?.startedAt || !subscription.expiresAt) return 0
   const startedDate = new Date(subscription.startedAt)
@@ -72,7 +93,10 @@ export default function AssinaturaPage() {
   const plan = useMemo(() => plans.find((item) => item.id === selectedPlan) ?? plans[1], [selectedPlan])
   const price = annual ? plan.price * 10 : plan.price
   const monthlyEquivalent = annual ? plan.price * 10 / 12 : plan.price
+  const daysRemaining = getDaysRemaining(subscription?.expiresAt ?? '')
   const validityProgress = getValidityProgress(subscription)
+  const renewalCopy = getRenewalCopy(daysRemaining)
+  const progressColor = getProgressColor(daysRemaining)
   const update = (key: keyof FormData, value: string) => setFormData((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
@@ -132,7 +156,7 @@ export default function AssinaturaPage() {
       <section className="mb-6 rounded-xl border border-emerald-500/25 bg-slate-900 px-4 py-3 shadow-lg shadow-emerald-500/5">
         <div className="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2 lg:min-w-[190px]"><Sparkles className="h-4 w-4 shrink-0 text-emerald-400" /><div><p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Meu plano atual</p><p className="font-bold text-white">{subscriptionLoading ? 'Carregando...' : formatPlanName(subscription?.plan ?? '') + (subscription?.plan ? ' Ativo' : '')}</p></div></div>
-          <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-2 text-xs lg:px-5"><span><span className="text-slate-500">Inicio: </span><strong className="text-slate-200">{formatDate(subscription?.startedAt ?? '')}</strong></span><span><span className="text-slate-500">Vencimento: </span><strong className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-slate-200'}>{formatDate(subscription?.expiresAt ?? '')}</strong></span><div className="min-w-[170px] flex-1"><div className="mb-1 flex items-center justify-between gap-3"><span className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-emerald-300'}>{getExpiryLabel(subscription?.expiresAt ?? '')}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400 transition-all duration-500" style={{ width: validityProgress + '%' }} /></div></div></div>
+          <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-2 text-xs lg:px-5"><span><span className="text-slate-500">Inicio: </span><strong className="text-slate-200">{formatDate(subscription?.startedAt ?? '')}</strong></span><span><span className="text-slate-500">Vencimento: </span><strong className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-slate-200'}>{formatDate(subscription?.expiresAt ?? '')}</strong></span><div className="min-w-[170px] flex-1"><div className="mb-1 flex items-center justify-between gap-3"><span className={getExpiryLabel(subscription?.expiresAt ?? '') === 'Vencido' ? 'text-rose-300' : 'text-emerald-300'}>{getExpiryLabel(subscription?.expiresAt ?? '')}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className={'h-full rounded-full transition-all duration-500 ' + progressColor} style={{ width: validityProgress + '%' }} /></div><p className="mt-1 text-[10px] text-slate-400">{renewalCopy}</p></div></div>
           <div className="flex items-center gap-3 lg:min-w-[210px] lg:justify-end"><div className="flex items-center gap-2"><RefreshCw className="h-3.5 w-3.5 text-emerald-400" /><span className="text-xs text-slate-400">Renovacao automatica</span></div><button type="button" disabled={!subscription || subscriptionLoading} onClick={toggleAutoRenewal} aria-pressed={subscription?.autoRenewal ?? false} aria-label="Alternar renovacao automatica" className={'relative h-5 w-9 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ' + (subscription?.autoRenewal ? 'bg-emerald-500' : 'bg-slate-700')}><span className={'absolute top-0.5 h-4 w-4 rounded-full bg-white transition ' + (subscription?.autoRenewal ? 'left-4' : 'left-0.5')} /></button><span className="text-[10px] font-semibold text-slate-500">{subscription?.autoRenewal ? 'Ativa' : 'Desativada'}</span></div>
         </div>
       </section>
