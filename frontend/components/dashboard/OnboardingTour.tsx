@@ -1,20 +1,24 @@
 ﻿'use client'
 
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type TourKey = 'clients' | 'agenda' | 'dashboard'
-type Step = { key: TourKey; title: string; text: string; href: string; action: string; icon: typeof QrCode }
+type TourKey = 'clients' | 'clients-qr' | 'agenda' | 'agenda-content' | 'dashboard' | 'dashboard-rescue'
+type Step = { key: TourKey; title: string; text: string; route: string; action: string; icon: typeof QrCode; next?: number }
 const steps: Step[] = [
-  { key: 'clients', title: 'Capture novos clientes', text: 'Clique em Meus Clientes para abrir a base completa da sua barbearia. La voce encontra o QR Code para capturar clientes no balcao, copia o link de cadastro e acompanha todos os seus clientes.', href: '/clientes', action: 'Ver QR Code', icon: QrCode },
-  { key: 'agenda', title: 'Organize sua agenda', text: 'Clique em Agenda para visualizar o controle de horarios do dia, os servicos escolhidos e o status de cada cadeira. Tudo fica organizado para voce atender sem conflitos.', href: '/agenda', action: 'Abrir Agenda', icon: CalendarDays },
-  { key: 'dashboard', title: 'Resgate clientes inativos', text: 'Clique em Dashboard para abrir o painel de controle. Voce vera as metricas da base e os alertas de clientes inativos prontos para resgate via WhatsApp.', href: '/dashboard', action: 'Ver Dashboard', icon: MessageCircle },
+  { key: 'clients', title: 'Meus Clientes', text: 'Vamos abrir sua base de clientes. O menu iluminado mostra onde voce gerencia cadastros, contatos e clientes em risco.', route: '/clientes', action: 'Abrir Meus Clientes', next: 1, icon: QrCode },
+  { key: 'clients-qr', title: 'QR Code de cadastro', text: 'Dentro de Meus Clientes, voce encontra o QR Code para deixar no balcao. O cliente escaneia, preenche os dados e entra automaticamente na sua base.', route: '/clientes', action: 'Continuar para Agenda', next: 2, icon: QrCode },
+  { key: 'agenda', title: 'Agenda', text: 'Agora vamos para a Agenda. Este menu leva ao controle central dos seus horarios e atendimentos.', route: '/agenda', action: 'Abrir Agenda', next: 3, icon: CalendarDays },
+  { key: 'agenda-content', title: 'Horarios e cadeiras', text: 'Na Agenda, voce visualiza a grade de horarios, servicos escolhidos e o status de cada cadeira para atender sem conflitos.', route: '/agenda', action: 'Continuar para Dashboard', next: 4, icon: CalendarDays },
+  { key: 'dashboard', title: 'Dashboard', text: 'Por fim, vamos abrir o Dashboard. Aqui ficam suas principais metricas e os alertas de clientes que precisam voltar.', route: '/dashboard', action: 'Abrir Dashboard', next: 5, icon: MessageCircle },
+  { key: 'dashboard-rescue', title: 'Resgate via WhatsApp', text: 'Nesta area voce identifica clientes inativos e pode abrir uma mensagem pronta no WhatsApp para recuperar novos horarios e faturamento.', route: '/dashboard', action: 'Concluir tour', icon: MessageCircle },
 ]
 type Position = { top: number; left: number; width: number; height: number; mobile: boolean }
 
 export function OnboardingTour() {
+  const router = useRouter()
   const [visible, setVisible] = useState(false)
   const [step, setStep] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
@@ -23,7 +27,7 @@ export function OnboardingTour() {
 
   const updatePosition = useCallback(() => {
     const element = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
-    if (!element) return
+    if (!element) { setPosition(null); return }
     const rect = element.getBoundingClientRect()
     setPosition({ top: rect.top, left: rect.left, width: rect.width, height: rect.height, mobile: window.innerWidth < 1024 })
   }, [current.key])
@@ -55,21 +59,36 @@ export function OnboardingTour() {
     const frame = window.requestAnimationFrame(updatePosition)
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
-    return () => { window.cancelAnimationFrame(frame); window.removeEventListener('resize', updatePosition); window.removeEventListener('scroll', updatePosition, true) }
+    const retry = window.setTimeout(updatePosition, 180)
+    return () => { window.cancelAnimationFrame(frame); window.clearTimeout(retry); window.removeEventListener('resize', updatePosition); window.removeEventListener('scroll', updatePosition, true) }
   }, [visible, step, updatePosition])
 
-  async function finish(kind: 'completed_at' | 'skipped_at') {
+  async function finish() {
     if (!userId) return
     const now = new Date().toISOString()
-    await createClient().from('lojista_onboarding').upsert({ user_id: userId, [kind]: now, updated_at: now }, { onConflict: 'user_id' })
+    await createClient().from('lojista_onboarding').upsert({ user_id: userId, completed_at: now, updated_at: now }, { onConflict: 'user_id' })
     window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
     setVisible(false)
+  }
+  async function skip() {
+    if (!userId) return
+    const now = new Date().toISOString()
+    await createClient().from('lojista_onboarding').upsert({ user_id: userId, skipped_at: now, updated_at: now }, { onConflict: 'user_id' })
+    window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
+    setVisible(false)
+  }
+  function next() {
+    if (typeof current.next !== 'number') { void finish(); return }
+    setPosition(null)
+    const nextStep = current.next
+    if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route)
+    setStep(nextStep)
   }
 
   if (!visible || !position) return null
   const Icon = current.icon
   const tooltipStyle = position.mobile
-    ? { top: Math.max(16, position.top - 290), left: Math.max(16, Math.min(window.innerWidth - 336, position.left + position.width / 2 - 160)) }
+    ? { top: Math.max(16, position.top - 292), left: Math.max(16, Math.min(window.innerWidth - 336, position.left + position.width / 2 - 160)) }
     : { top: Math.max(16, Math.min(window.innerHeight - 300, position.top)), left: Math.min(window.innerWidth - 360, position.left + position.width + 18) }
 
   return <>
@@ -77,10 +96,9 @@ export function OnboardingTour() {
     <div className="pointer-events-none fixed z-[56] rounded-xl border-2 border-emerald-300 shadow-[0_0_0_9999px_rgba(2,6,23,0.74),0_0_28px_rgba(52,211,153,0.55)]" style={{ top: position.top - 4, left: position.left - 4, width: position.width + 8, height: position.height + 8 }} />
     <section role="dialog" aria-modal="true" aria-labelledby="tour-title" className="fixed z-[57] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-emerald-400/40 bg-slate-900 p-5 shadow-2xl" style={tooltipStyle}>
       <span className={`absolute ${position.mobile ? 'bottom-[-9px] left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-emerald-400/40' : 'left-[-9px] top-7 border-b-8 border-r-8 border-t-8 border-b-transparent border-t-transparent border-r-emerald-400/40'}`} />
-      <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-300"><Icon className="h-5 w-5" /></span><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Passo {step + 1} de {steps.length}</p><h2 id="tour-title" className="mt-1 text-base font-bold text-white">{current.title}</h2></div></div><button type="button" onClick={() => void finish('skipped_at')} aria-label="Pular tour" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X className="h-4 w-4" /></button></div>
+      <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-300"><Icon className="h-5 w-5" /></span><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Passo {step + 1} de {steps.length}</p><h2 id="tour-title" className="mt-1 text-base font-bold text-white">{current.title}</h2></div></div><button type="button" onClick={() => void skip()} aria-label="Pular tour" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X className="h-4 w-4" /></button></div>
       <p className="mt-4 text-sm leading-6 text-slate-400">{current.text}</p><div className="mt-4 flex gap-1.5">{steps.map((_, index) => <span key={index} className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-emerald-400' : 'bg-slate-700'}`} />)}</div>
-      <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void finish('skipped_at')} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}{step < steps.length - 1 ? <button type="button" onClick={() => setStep((value) => value + 1)} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">Proximo</button> : <Link href={current.href} onClick={() => void finish('completed_at')} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">Clique no menu iluminado</Link>}</div></div>
+      <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void skip()} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={() => { setPosition(null); setStep((value) => value - 1) }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}<button type="button" onClick={next} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">{current.action}</button></div></div>
     </section>
   </>
 }
-

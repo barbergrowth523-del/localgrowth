@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, UserRound, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -266,7 +266,7 @@ export default function AgendaPage() {
             </div>
           </section>
 
-          <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+          <section data-tour="agenda-content" className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 p-5">
               <div><h2 className="font-semibold text-white">Horarios marcados</h2><p className="mt-1 text-xs text-slate-500">{displayDate(selectedDate)} - {dayAppointments.length ? dayAppointments.length + (dayAppointments.length === 1 ? ' corte' : ' cortes') : 'Disponivel'}</p></div>
               <Clock3 className="h-5 w-5 text-emerald-400" />
@@ -315,3 +315,4 @@ export default function AgendaPage() {
     </main>
   )
 }
+
