@@ -1,84 +1,54 @@
-'use client'
+﻿'use client'
 
-import { FormEvent, useState } from 'react'
-import { ArrowRight, Check, Star } from 'lucide-react'
+import { type FormEvent, useEffect, useState } from 'react'
+import { ArrowRight, Check, Eye, EyeOff, KeyRound, Star, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 
 const SUPER_ADMIN_EMAIL = 'barbergrowth523@gmail.com'
 
+type PasswordFieldProps = { label: string; value: string; onChange: (value: string) => void; placeholder: string; required?: boolean; minLength?: number }
+function PasswordField({ label, value, onChange, placeholder, required = true, minLength = 6 }: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false)
+  return <label className="block text-sm font-medium text-slate-200">{label}<div className="relative mt-2"><input required={required} minLength={minLength} type={visible ? 'text' : 'password'} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3.5 pr-12 text-base text-white outline-none ring-emerald-400 transition placeholder:text-slate-600 focus:ring-2" placeholder={placeholder} /><button type="button" onClick={() => setVisible((current) => !current)} aria-label={visible ? 'Esconder senha' : 'Mostrar senha'} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-emerald-300">{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
+}
+
 export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | 'signup' }) {
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode)
+  const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
+  const [recoveryEmail, setRecoveryEmail] = useState('')
+  const [recoveryToken, setRecoveryToken] = useState('')
+  const [recoveryPassword, setRecoveryPassword] = useState('')
+  const [recoveryStep, setRecoveryStep] = useState<'email' | 'token'>('email')
+  const [recoveryMessage, setRecoveryMessage] = useState('')
+  const [recoveryLoading, setRecoveryLoading] = useState(false)
+
+  useEffect(() => { if (window.location.search.includes('recovery=1') || window.location.hash.includes('type=recovery')) { setRecoveryOpen(true); setRecoveryStep('token') } }, [])
 
   async function submit(event: FormEvent) {
-    event.preventDefault()
-    setLoading(true)
-    setMessage('')
-    const supabase = createClient()
-    const result = mode === 'login'
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + '/dashboard' } })
-    setLoading(false)
-    if (result.error) return setMessage(result.error.message)
+    event.preventDefault(); setLoading(true); setMessage(''); const supabase = createClient()
+    const result = mode === 'login' ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + '/dashboard' } })
+    setLoading(false); if (result.error) return setMessage(result.error.message)
     if (mode === 'signup') return setMessage('Confira seu e-mail para confirmar o cadastro.')
-    const user = result.data.user
-    if (user) {
-      void supabase.from('account_activity_events').insert({ user_id: user.id, event_type: 'login' })
-    }
-    const metadataRole = user?.app_metadata?.role
-    const normalizedEmail = user?.email?.trim().toLowerCase() ?? email.trim().toLowerCase()
-    let profileRole: string | null = null
-
-    if (user) {
-      const { data: profile } = await supabase
-        .from('perfis_barbearia')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
-      profileRole = typeof profile?.role === 'string' ? profile.role : null
-    }
-
-    const isAdmin = normalizedEmail === SUPER_ADMIN_EMAIL || metadataRole === 'admin' || profileRole === 'admin'
-    window.location.replace(isAdmin ? '/admin/dashboard' : '/dashboard')
+    const user = result.data.user; if (user) void supabase.from('account_activity_events').insert({ user_id: user.id, event_type: 'login' })
+    const metadataRole = user?.app_metadata?.role; const normalizedEmail = user?.email?.trim().toLowerCase() ?? email.trim().toLowerCase(); let profileRole: string | null = null
+    if (user) { const { data: profile } = await supabase.from('perfis_barbearia').select('role').eq('id', user.id).maybeSingle(); profileRole = typeof profile?.role === 'string' ? profile.role : null }
+    window.location.replace(normalizedEmail === SUPER_ADMIN_EMAIL || metadataRole === 'admin' || profileRole === 'admin' ? '/admin/dashboard' : '/dashboard')
   }
 
-  return (
-    <AuthLayout
-      aside={
-        <div className="mt-8">
-          <p className="mb-4 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">{'Relacionamento que mant\u00e9m a cadeira cheia.'}</p>
-          <h1 className="text-5xl font-semibold leading-[.98] tracking-[-.06em] text-white xl:text-6xl">{'Seu cliente n\u00e3o deveria precisar lembrar de voc\u00ea.'}</h1>
-          <p className="mt-5 text-base leading-7 text-slate-400 xl:text-lg xl:leading-8">{'Organize seus clientes, entenda quem est\u00e1 sumido e transforme uma mensagem em mais um hor\u00e1rio marcado.'}</p>
-          <ul className="mt-6 space-y-3 text-sm text-slate-300">
-            <li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />{'Integra\u00e7\u00e3o instant\u00e2nea com WhatsApp'}</li>
-            <li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />{'Mapeamento inteligente de evas\u00e3o'}</li>
-            <li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Retorno sobre investimento imediato</li>
-          </ul>
-          <div className="mt-8 w-full rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md sm:p-6">
-            <div className="flex gap-1 text-amber-400">{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={14} fill="currentColor" />)}</div>
-            <p className="mt-4 text-sm italic leading-6 text-slate-300">&quot;O sistema encontrou R$ 850 perdidos na minha base de clientes logo no primeiro dia de uso. O investimento se pagou na mesma hora.&quot;</p>
-            <p className="mt-4 text-sm font-semibold text-white">Marcos, Carvalhos Barber Shop</p>
-          </div>
-        </div>
-      }
-    >
-      <div>
-        <p className="text-sm font-medium text-emerald-400">Bem-vindo de volta</p>
-        <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{mode === 'login' ? 'Entre na sua conta' : 'Crie sua conta'}</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-400 sm:text-base">{'Comece a cuidar melhor do seu neg\u00f3cio hoje.'}</p>
-        <form onSubmit={submit} className="mt-8 space-y-5">
-          <label className="block text-sm font-medium text-slate-200">E-mail<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3.5 text-base text-white outline-none ring-emerald-400 transition placeholder:text-slate-600 focus:ring-2" placeholder="voce@barbearia.com" /></label>
-          <label className="block text-sm font-medium text-slate-200">Senha<input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3.5 text-base text-white outline-none ring-emerald-400 transition placeholder:text-slate-600 focus:ring-2" placeholder="Sua senha" /></label>
-          {message && <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">{message}</p>}
-          <button disabled={loading} type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 py-3.5 text-base font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:opacity-60">{loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}<ArrowRight size={17} /></button>
-        </form>
-        <button type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage('') }} className="mt-7 flex w-full items-center justify-center gap-1 text-sm text-slate-400">{mode === 'login' ? 'Ainda n\u00e3o tem uma conta?' : 'J\u00e1 tem uma conta?'}<span className="font-semibold text-emerald-400">{mode === 'login' ? 'Cadastre-se' : 'Entrar'}</span></button>
-        <div className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-500"><Check size={14} className="text-emerald-400" /> Seus dados ficam protegidos pelo Supabase</div>
-      </div>
+  async function continueWithGoogle() { setLoading(true); setMessage(''); const { error } = await createClient().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } }); if (error) { setLoading(false); setMessage(error.message) } }
+  async function sendRecoveryEmail(event: FormEvent) { event.preventDefault(); setRecoveryLoading(true); setRecoveryMessage(''); const { error } = await createClient().auth.resetPasswordForEmail(recoveryEmail, { redirectTo: `${window.location.origin}/login?recovery=1` }); setRecoveryLoading(false); if (error) return setRecoveryMessage(error.message); setRecoveryStep('token'); setRecoveryMessage('Enviamos um link seguro. Cole aqui o token recebido ou use o link do e-mail.') }
+  async function updateRecoveredPassword(event: FormEvent) { event.preventDefault(); setRecoveryLoading(true); setRecoveryMessage(''); const supabase = createClient(); if (recoveryToken.trim()) { const { error: verifyError } = await supabase.auth.verifyOtp({ email: recoveryEmail, token: recoveryToken.trim(), type: 'recovery' }); if (verifyError) { setRecoveryLoading(false); return setRecoveryMessage('Token invalido ou expirado. Solicite um novo e-mail.') } } else { const { data } = await supabase.auth.getSession(); if (!data.session) { setRecoveryLoading(false); return setRecoveryMessage('Abra o link do e-mail ou cole o token recebido.') } } const { error } = await supabase.auth.updateUser({ password: recoveryPassword }); setRecoveryLoading(false); if (error) return setRecoveryMessage(error.message); setRecoveryMessage('Senha atualizada com sucesso. Voce ja pode entrar.'); setRecoveryStep('email'); setRecoveryToken(''); setRecoveryPassword('') }
+
+  return <>
+    <AuthLayout aside={<div className="mt-8"><p className="mb-4 text-sm font-bold uppercase tracking-[.2em] text-emerald-400">Relacionamento que mantem a cadeira cheia.</p><h1 className="text-5xl font-semibold leading-[.98] tracking-[-.06em] text-white xl:text-6xl">Seu cliente nao deveria precisar lembrar de voce.</h1><p className="mt-5 text-base leading-7 text-slate-400 xl:text-lg xl:leading-8">Organize seus clientes, entenda quem esta sumido e transforme uma mensagem em mais um horario marcado.</p><ul className="mt-6 space-y-3 text-sm text-slate-300"><li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Integracao instantanea com WhatsApp</li><li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Mapeamento inteligente de evasao</li><li className="flex items-center gap-3"><Check size={16} className="shrink-0 text-emerald-400" />Retorno sobre investimento imediato</li></ul><div className="mt-8 w-full rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md sm:p-6"><div className="flex gap-1 text-amber-400">{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={14} fill="currentColor" />)}</div><p className="mt-4 text-sm italic leading-6 text-slate-300">&quot;O sistema encontrou R$ 850 perdidos na minha base de clientes logo no primeiro dia de uso. O investimento se pagou na mesma hora.&quot;</p><p className="mt-4 text-sm font-semibold text-white">Marcos, Carvalhos Barber Shop</p></div></div>}>
+      <div><p className="text-sm font-medium text-emerald-400">{mode === 'login' ? 'Bem-vindo de volta' : 'Comece agora'}</p><h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{mode === 'login' ? 'Entre na sua conta' : 'Crie sua conta'}</h2><p className="mt-3 text-sm leading-6 text-slate-400 sm:text-base">Comece a cuidar melhor do seu negocio hoje.</p><form onSubmit={submit} className="mt-8 space-y-5"><label className="block text-sm font-medium text-slate-200">E-mail<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3.5 text-base text-white outline-none ring-emerald-400 transition placeholder:text-slate-600 focus:ring-2" placeholder="voce@barbearia.com" /></label><PasswordField label="Senha" value={password} onChange={setPassword} placeholder="Sua senha" />{mode === 'login' && <button type="button" onClick={() => { setRecoveryEmail(email); setRecoveryOpen(true); setRecoveryMessage('') }} className="text-xs font-semibold text-emerald-400 transition hover:text-emerald-300">Esqueci minha senha</button>}{message && <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">{message}</p>}<button disabled={loading} type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 py-3.5 text-base font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:opacity-60">{loading ? 'Aguarde...' : mode === 'login' ? 'Entrar' : 'Criar conta'}<ArrowRight size={17} /></button></form><div className="my-5 flex items-center gap-3 text-xs text-slate-600"><span className="h-px flex-1 bg-slate-800" />ou<span className="h-px flex-1 bg-slate-800" /></div><button type="button" onClick={() => void continueWithGoogle()} disabled={loading} className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-700 bg-slate-900 py-3.5 text-sm font-semibold text-white transition hover:border-emerald-500/50 hover:bg-slate-800 disabled:opacity-60"><span className="rounded bg-white px-1.5 py-0.5 text-xs font-black text-slate-900">G</span>Continuar com o Google</button><button type="button" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setMessage('') }} className="mt-7 flex w-full items-center justify-center gap-1 text-sm text-slate-400">{mode === 'login' ? 'Ainda nao tem uma conta?' : 'Ja tem uma conta?'}<span className="font-semibold text-emerald-400">{mode === 'login' ? 'Cadastre-se' : 'Entrar'}</span></button><div className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-500"><Check size={14} className="text-emerald-400" /> Seus dados ficam protegidos pelo Supabase</div></div>
     </AuthLayout>
-  )
+    {recoveryOpen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"><section role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"><div className="flex items-start justify-between"><div><div className="mb-3 inline-flex rounded-xl bg-emerald-500/10 p-2 text-emerald-400"><KeyRound className="h-5 w-5" /></div><h3 className="text-xl font-bold text-white">Recuperar acesso</h3><p className="mt-1 text-sm text-slate-400">Enviaremos um link seguro para seu e-mail.</p></div><button type="button" onClick={() => setRecoveryOpen(false)} aria-label="Fechar recuperacao" className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></div>{recoveryStep === 'email' ? <form onSubmit={sendRecoveryEmail} className="mt-6 space-y-4"><label className="block text-sm text-slate-300">E-mail<input required type="email" value={recoveryEmail} onChange={(event) => setRecoveryEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500" placeholder="voce@barbearia.com" /></label><button disabled={recoveryLoading} className="w-full rounded-xl bg-emerald-400 py-3 font-bold text-slate-950 hover:bg-emerald-300 disabled:opacity-60">{recoveryLoading ? 'Enviando...' : 'Enviar link seguro'}</button></form> : <form onSubmit={updateRecoveredPassword} className="mt-6 space-y-4"><label className="block text-sm text-slate-300">Token ou codigo (opcional ao abrir pelo link)<input value={recoveryToken} onChange={(event) => setRecoveryToken(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500" placeholder="Cole o token ou codigo" /></label><PasswordField label="Nova senha" value={recoveryPassword} onChange={setRecoveryPassword} placeholder="Minimo de 6 caracteres" /><button disabled={recoveryLoading} className="w-full rounded-xl bg-emerald-400 py-3 font-bold text-slate-950 hover:bg-emerald-300 disabled:opacity-60">{recoveryLoading ? 'Atualizando...' : 'Atualizar senha'}</button></form>}{recoveryMessage && <p className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">{recoveryMessage}</p>}</section></div>}
+  </>
 }
+
