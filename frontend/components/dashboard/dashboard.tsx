@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
@@ -168,11 +168,15 @@ function BirthdayPanel({ clients }: { clients: Client[] }) {
   return <section className="mb-6 rounded-xl border border-slate-800 bg-slate-900 p-5 shadow-sm"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><div className="rounded-lg bg-amber-500/10 p-2 text-amber-400"><Cake size={18} /></div><div><h2 className="font-semibold text-white">Aniversariantes do mes</h2><p className="mt-1 text-xs text-slate-500">Parabenize seus clientes e ofereca 15% de desconto no proximo corte.</p></div></div><span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300">{birthdayClients.length} neste mes</span></div>{birthdayClients.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{birthdayClients.map((client) => { const day = Number(client.birthday?.slice(-2)); const thisWeek = day >= currentDay && day <= currentDay + 7; return <div key={client.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{client.name}</p><p className="mt-1 text-xs text-slate-500">Dia {String(day).padStart(2, '0')} {thisWeek ? '- Nesta semana' : ''}</p></div><button type="button" onClick={() => openBirthdayWhatsApp(client)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"><MessageCircle size={14} /> WhatsApp</button></div> })}</div> : <div className="mt-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 text-center text-sm text-slate-500">Nenhum aniversariante cadastrado neste mes. Adicione datas no cadastro de clientes.</div>}</section>
 }
 function HealthBaseChart({ clients }: { clients: Client[] }) {
+  if (!clients.length) {
+    return <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow-sm"><h3 className="mb-2 text-sm font-semibold text-slate-500">Saude da Base de Clientes</h3><div className="h-3 w-full rounded-full bg-slate-800" /><p className="mt-2 text-xs text-slate-600">Adicione clientes para ativar esta visao.</p></div>
+  }
+
   const totals = clients.reduce((summary, client) => {
     summary[getRetentionStatus(client)] += 1
     return summary
   }, { em_dia: 0, alerta: 0, sumido: 0 })
-  const total = clients.length || 1
+  const total = clients.length
   const retained = Math.round((totals.em_dia / total) * 100)
   const alert = Math.round((totals.alerta / total) * 100)
   const risk = Math.max(0, 100 - retained - alert)

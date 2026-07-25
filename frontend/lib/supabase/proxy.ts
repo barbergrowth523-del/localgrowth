@@ -37,7 +37,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
   if (!claims && requiresOwnerSession) return NextResponse.redirect(new URL('/login', request.url))
-  if (claims && requiresOwnerSession && isAdminIdentity) return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+  // The admin account can inspect owner routes for QA.
+  if (claims && requiresOwnerSession && isAdminIdentity && path === '/dashboard') return NextResponse.redirect(new URL('/admin/dashboard', request.url))
   if (claims && (path === '/' || path === '/login' || path === '/cadastro')) {
     return NextResponse.redirect(new URL(isAdminIdentity ? '/admin/dashboard' : '/dashboard', request.url))
   }

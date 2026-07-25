@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
@@ -43,14 +43,17 @@ export function OnboardingTour() {
       if (!user) return
       setUserId(user.id)
       const localKey = `prontusfy-onboarding-${user.id}`
-      if (window.localStorage.getItem(localKey) === 'done') return
+      const isTestAccount = user.email?.trim().toLowerCase() === 'barbergrowth523@gmail.com'
+      const tourRoutes = new Set(steps.map((item) => item.route))
+      if (!tourRoutes.has(pathname)) return
+      if (!isTestAccount && window.localStorage.getItem(localKey) === 'done') return
       const savedStep = Number(window.localStorage.getItem(localKey + '-step'))
       const initialStep = Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length ? savedStep : 0
       setStep(initialStep)
       if (steps[initialStep].route !== pathname) router.push(steps[initialStep].route)
       if (Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length) setStep(savedStep)
       const { data } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
-      if (!data?.completed_at && !data?.skipped_at) setVisible(true)
+      if (isTestAccount || (!data?.completed_at && !data?.skipped_at)) setVisible(true)
     })()
   }, [pathname, router])
 
