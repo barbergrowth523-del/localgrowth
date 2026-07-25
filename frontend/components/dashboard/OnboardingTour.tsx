@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 type TourKey = 'clients' | 'clients-qr' | 'agenda' | 'agenda-content' | 'dashboard' | 'dashboard-rescue'
 type Step = { key: TourKey; title: string; text: string; route: string; action: string; icon: typeof QrCode; next?: number }
 const steps: Step[] = [
-  { key: 'clients', title: 'Meus Clientes', text: 'Vamos abrir sua base de clientes. O menu iluminado mostra onde voce gerencia cadastros, contatos e clientes em risco.', route: '/clientes', action: 'Abrir Meus Clientes', next: 1, icon: QrCode },
+  { key: 'clients', title: 'Meus Clientes', text: 'Vamos abrir sua base de clientes. O menu iluminado mostra onde voce gerencia cadastros, contatos e clientes em risco.', route: '/dashboard', action: 'Abrir Meus Clientes', next: 1, icon: QrCode },
   { key: 'clients-qr', title: 'QR Code de cadastro', text: 'Dentro de Meus Clientes, voce encontra o QR Code para deixar no balcao. O cliente escaneia, preenche os dados e entra automaticamente na sua base.', route: '/clientes', action: 'Continuar para Agenda', next: 2, icon: QrCode },
   { key: 'agenda', title: 'Agenda', text: 'Agora vamos para a Agenda. Este menu leva ao controle central dos seus horarios e atendimentos.', route: '/agenda', action: 'Abrir Agenda', next: 3, icon: CalendarDays },
   { key: 'agenda-content', title: 'Horarios e cadeiras', text: 'Na Agenda, voce visualiza a grade de horarios, servicos escolhidos e o status de cada cadeira para atender sem conflitos.', route: '/agenda', action: 'Continuar para Dashboard', next: 4, icon: CalendarDays },
@@ -19,6 +19,7 @@ type Position = { top: number; left: number; width: number; height: number; plac
 
 export function OnboardingTour() {
   const router = useRouter()
+  const pathname = usePathname()
   const [visible, setVisible] = useState(false)
   const [step, setStep] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
@@ -44,11 +45,14 @@ export function OnboardingTour() {
       const localKey = `prontusfy-onboarding-${user.id}`
       if (window.localStorage.getItem(localKey) === 'done') return
       const savedStep = Number(window.localStorage.getItem(localKey + '-step'))
+      const initialStep = Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length ? savedStep : 0
+      setStep(initialStep)
+      if (steps[initialStep].route !== pathname) router.push(steps[initialStep].route)
       if (Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length) setStep(savedStep)
       const { data } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
       if (!data?.completed_at && !data?.skipped_at) setVisible(true)
     })()
-  }, [])
+  }, [pathname, router])
 
   useEffect(() => {
     if (!visible) return
@@ -137,6 +141,7 @@ export function OnboardingTour() {
     </section>
   </>
 }
+
 
 
 
