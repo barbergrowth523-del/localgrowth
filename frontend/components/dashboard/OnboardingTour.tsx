@@ -84,12 +84,21 @@ export function OnboardingTour() {
     return () => { observer.disconnect(); window.clearInterval(retry) }
   }, [visible, current.key, updatePosition])
 
+  function clearDemo() {
+    window.localStorage.removeItem(`prontusfy-onboarding-${userId ?? 'unknown'}-step`)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('tour')
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+    window.dispatchEvent(new Event('prontusfy-tour-ended'))
+  }
+
   async function finish() {
     if (!userId) return
     const now = new Date().toISOString()
     await createClient().from('lojista_onboarding').upsert({ user_id: userId, completed_at: now, updated_at: now }, { onConflict: 'user_id' })
     window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
     window.localStorage.removeItem(`prontusfy-onboarding-${userId}-step`)
+    clearDemo()
     setVisible(false)
   }
   async function skip() {
@@ -98,6 +107,7 @@ export function OnboardingTour() {
     await createClient().from('lojista_onboarding').upsert({ user_id: userId, skipped_at: now, updated_at: now }, { onConflict: 'user_id' })
     window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
     window.localStorage.removeItem(`prontusfy-onboarding-${userId}-step`)
+    clearDemo()
     setVisible(false)
   }
   function next() {
@@ -106,7 +116,8 @@ export function OnboardingTour() {
 
     const nextStep = current.next
     if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(nextStep))
-    if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route)
+    if (nextStep === 5) router.push('/dashboard?tour=1')
+    else if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route)
     setStep(nextStep)
   }
 
@@ -141,6 +152,8 @@ export function OnboardingTour() {
     </section>
   </>
 }
+
+
 
 
 

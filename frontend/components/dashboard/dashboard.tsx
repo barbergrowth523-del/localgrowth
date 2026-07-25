@@ -6,6 +6,7 @@ import { AlertCircle, CalendarDays, CheckCircle2, ChevronRight, Clipboard, FileU
 import { createClient } from '@/lib/supabase/client'
 
 type Client = { id: string; name: string; phone: string; last_cut_at: string; status_calculado?: string; frequency?: 'semanal' | 'quinzenal' | 'mensal'; birthday?: string }
+const demoClient: Client = { id: 'tour-demo-client', name: 'Cliente de demonstracao', phone: '5574999990000', last_cut_at: '2026-05-01', frequency: 'mensal', status_calculado: 'sumido' }
 const sample: Client[] = [{ id: '1', name: 'Mariana Costa', phone: '5571998765432', last_cut_at: '2026-07-17', frequency: 'semanal' }, { id: '2', name: 'Lucas Almeida', phone: '5571987654321', last_cut_at: '2026-06-12', frequency: 'quinzenal' }, { id: '3', name: 'Rafael Santos', phone: '5571991234567', last_cut_at: '2026-05-28', frequency: 'mensal' }]
 const isOverdue = (date: string) => (Date.now() - new Date(`${date}T12:00:00`).getTime()) / 86400000 > 30
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '')
@@ -40,9 +41,11 @@ function buildWhatsAppMessage(name: string) {
 export function Dashboard({ userEmail }: { userEmail: string }) {
   const fallbackName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Usuario').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
   const [profileName, setProfileName] = useState('')
+  const [tourDemo, setTourDemo] = useState(false)
   const [planLabel, setPlanLabel] = useState('Plano Free')
   const displayName = profileName || fallbackName
   const firstName = displayName.split(' ')[0] || 'Usuario'
+  useEffect(() => { const syncTourDemo = () => setTourDemo(new URLSearchParams(window.location.search).get('tour') === '1'); syncTourDemo(); window.addEventListener('prontusfy-tour-ended', syncTourDemo); return () => window.removeEventListener('prontusfy-tour-ended', syncTourDemo) }, [])
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
   async function loadClients() {
     const supabase = createClient()
@@ -70,13 +73,14 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     const rows = (data ?? []) as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }>
     setClients(rows.map(client => ({ id: client.id, name: client.nome, phone: client.telefone, last_cut_at: client.data_ultimo_corte, status_calculado: undefined, frequency: undefined, birthday: client.data_nascimento ?? undefined })))
   }  useEffect(() => { void loadClients() }, [])
-  const filteredClientes = useMemo(() => { const source = clients.length ? clients : sample; const normalizedSearch = searchTerm.trim().toLowerCase(); return source.filter(client => { const matchesSearch = (client.name + ' ' + client.phone).toLowerCase().includes(normalizedSearch); const normalizedFrequency = client.frequency?.toLowerCase(); const matchesFrequency = frequencyFilter === 'todos' || !normalizedFrequency || normalizedFrequency === frequencyFilter; return matchesSearch && matchesFrequency }) }, [clients, searchTerm, frequencyFilter])
+  const filteredClientes = useMemo(() => { const source = tourDemo ? [demoClient, ...(clients.length ? clients : sample)] : (clients.length ? clients : sample); const normalizedSearch = searchTerm.trim().toLowerCase(); return source.filter(client => { const matchesSearch = (client.name + ' ' + client.phone).toLowerCase().includes(normalizedSearch); const normalizedFrequency = client.frequency?.toLowerCase(); const matchesFrequency = frequencyFilter === 'todos' || !normalizedFrequency || normalizedFrequency === frequencyFilter; return matchesSearch && matchesFrequency }) }, [clients, searchTerm, frequencyFilter, tourDemo])
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file || isUploading) return
     setIsUploading(true)
     try {
       const rows = (await file.text()).split(/\r?\n/).filter(Boolean)
+
       const parsed = rows.slice(1).map(row => {
         const [name, phone, date] = row.split(',').map(value => value.trim().replace(/^"|"$/g, ''))
         return { name, phone: phone.replace(/\D/g, ''), last_cut_at: date }
@@ -105,7 +109,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
       event.target.value = ''
     }
   }
-    const dashboardClients = clients.length ? clients : sample
+    const dashboardClients = tourDemo ? [demoClient, ...(clients.length ? clients : sample)] : (clients.length ? clients : sample)
   const sumidoCount = dashboardClients.filter(c => getRetentionStatus(c) === 'sumido').length
   const atRisk = sumidoCount * 60
   const estimatedRecoveries = Math.min(sumidoCount, 2)
@@ -224,5 +228,8 @@ function ClientRow({ client, onSelect }: { client: Client; onSelect: () => void 
     <td className="px-5 py-4 text-right"><a data-tour={vipAtRisk ? "dashboard-rescue" : undefined} onClick={event => event.stopPropagation()} href={'https://wa.me/' + client.phone + '?text=' + encodeURIComponent(buildWhatsAppMessage(client.name))} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700"><MessageCircle size={14} /> WhatsApp</a></td>
   </tr>
 }
+
+
+
 
 
