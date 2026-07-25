@@ -43,7 +43,7 @@ export function OnboardingTour() {
       if (!user) return
       setUserId(user.id)
       const localKey = `prontusfy-onboarding-${user.id}`
-      const isTestAccount = user.email?.trim().toLowerCase() === 'barbergrowth523@gmail.com'
+      const isTestAccount = user.email?.trim().toLowerCase() === 'afiliadopro500@gmail.com'
       const tourRoutes = new Set(steps.map((item) => item.route))
       if (!tourRoutes.has(pathname)) return
       if (!isTestAccount && window.localStorage.getItem(localKey) === 'done') return
