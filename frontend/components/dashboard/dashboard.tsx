@@ -44,7 +44,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
   const [planLabel, setPlanLabel] = useState('Plano Free')
   const displayName = profileName || fallbackName
   const firstName = displayName.split(' ')[0] || 'Usuario'
-  useEffect(() => { const syncTourDemo = () => setTourDemo(new URLSearchParams(window.location.search).get('tour') === '1'); syncTourDemo(); window.addEventListener('prontusfy-tour-ended', syncTourDemo); return () => window.removeEventListener('prontusfy-tour-ended', syncTourDemo) }, [])
+  useEffect(() => { const syncTourDemo = () => { const params = new URLSearchParams(window.location.search); setTourDemo(params.get('tour') === '1' && params.get('tourStep') === '5') }; syncTourDemo(); window.addEventListener('prontusfy-tour-ended', syncTourDemo); return () => window.removeEventListener('prontusfy-tour-ended', syncTourDemo) }, [])
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
   async function loadClients() {
     const supabase = createClient()
@@ -227,6 +227,7 @@ function ClientRow({ client, onSelect }: { client: Client; onSelect: () => void 
     <td className="px-5 py-4 text-right"><a data-tour={vipAtRisk ? "dashboard-rescue" : undefined} onClick={event => event.stopPropagation()} href={'https://wa.me/' + client.phone + '?text=' + encodeURIComponent(buildWhatsAppMessage(client.name))} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700"><MessageCircle size={14} /> WhatsApp</a></td>
   </tr>
 }
+
 
 
 

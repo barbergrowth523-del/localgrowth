@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
@@ -116,7 +116,7 @@ export function OnboardingTour() {
 
     const nextStep = current.next
     if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(nextStep))
-    if (nextStep === 5) router.push('/dashboard?tour=1')
+    if (nextStep === 5) router.push('/dashboard?tour=1&tourStep=5')
     else if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route)
     setStep(nextStep)
   }
@@ -152,6 +152,7 @@ export function OnboardingTour() {
     </section>
   </>
 }
+
 
 
 
