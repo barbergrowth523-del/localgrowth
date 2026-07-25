@@ -45,7 +45,8 @@ export function OnboardingTour() {
       const localKey = `prontusfy-onboarding-${user.id}`
       const isTestAccount = user.email?.trim().toLowerCase() === 'afiliadopro500@gmail.com'
       const tourRoutes = new Set(steps.map((item) => item.route))
-      if (!tourRoutes.has(pathname)) return
+      const tourNavigation = new URLSearchParams(window.location.search).get('tour') === '1'
+      if (!tourRoutes.has(pathname) || (pathname !== '/dashboard' && !tourNavigation)) return
       if (!isTestAccount && window.localStorage.getItem(localKey) === 'done') return
       const savedStepValue = window.localStorage.getItem(localKey + '-step')
       const savedStep = Number(savedStepValue)
@@ -123,7 +124,7 @@ export function OnboardingTour() {
     const nextStep = current.next
     if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(nextStep))
     if (nextStep === 5) router.push('/dashboard?tour=1&tourStep=5')
-    else if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route)
+    else if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route + '?tour=1&tourStep=' + nextStep)
     setStep(nextStep)
   }
 
@@ -131,7 +132,7 @@ export function OnboardingTour() {
     if (step === 0) return
     const previousStep = step - 1
     if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(previousStep))
-    if (steps[previousStep].route !== current.route) router.push(steps[previousStep].route)
+    if (steps[previousStep].route !== current.route) router.push(steps[previousStep].route + '?tour=1&tourStep=' + previousStep)
     setStep(previousStep)
   }
 
