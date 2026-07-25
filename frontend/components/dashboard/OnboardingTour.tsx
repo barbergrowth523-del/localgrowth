@@ -47,11 +47,14 @@ export function OnboardingTour() {
       const tourRoutes = new Set(steps.map((item) => item.route))
       if (!tourRoutes.has(pathname)) return
       if (!isTestAccount && window.localStorage.getItem(localKey) === 'done') return
-      const savedStep = Number(window.localStorage.getItem(localKey + '-step'))
-      const initialStep = Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length ? savedStep : 0
+      const savedStepValue = window.localStorage.getItem(localKey + '-step')
+      const savedStep = Number(savedStepValue)
+      const hasSavedStep = Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length
+      if (isTestAccount && !hasSavedStep && pathname !== '/dashboard') return
+      const initialStep = hasSavedStep ? savedStep : 0
       setStep(initialStep)
       if (steps[initialStep].route !== pathname) router.push(steps[initialStep].route)
-      if (Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length) setStep(savedStep)
+      if (hasSavedStep) setStep(savedStep)
       const { data } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
       if (isTestAccount || (!data?.completed_at && !data?.skipped_at)) setVisible(true)
     })()
