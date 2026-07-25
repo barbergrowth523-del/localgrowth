@@ -8,9 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 type TourKey = 'clients' | 'agenda' | 'dashboard'
 type Step = { key: TourKey; title: string; text: string; href: string; action: string; icon: typeof QrCode }
 const steps: Step[] = [
-  { key: 'clients', title: 'Capture novos clientes', text: 'Encontre seu QR Code e deixe a placa no balcao. O cliente se cadastra em poucos segundos.', href: '/clientes', action: 'Ver QR Code', icon: QrCode },
-  { key: 'agenda', title: 'Organize sua agenda', text: 'Use a Agenda para controlar horarios, servicos e status dos atendimentos.', href: '/agenda', action: 'Abrir Agenda', icon: CalendarDays },
-  { key: 'dashboard', title: 'Resgate clientes inativos', text: 'Na Dashboard, identifique quem sumiu e envie uma mensagem pronta pelo WhatsApp.', href: '/dashboard', action: 'Ver Dashboard', icon: MessageCircle },
+  { key: 'clients', title: 'Capture novos clientes', text: 'Clique em Meus Clientes para abrir a base completa da sua barbearia. La voce encontra o QR Code para capturar clientes no balcao, copia o link de cadastro e acompanha todos os seus clientes.', href: '/clientes', action: 'Ver QR Code', icon: QrCode },
+  { key: 'agenda', title: 'Organize sua agenda', text: 'Clique em Agenda para visualizar o controle de horarios do dia, os servicos escolhidos e o status de cada cadeira. Tudo fica organizado para voce atender sem conflitos.', href: '/agenda', action: 'Abrir Agenda', icon: CalendarDays },
+  { key: 'dashboard', title: 'Resgate clientes inativos', text: 'Clique em Dashboard para abrir o painel de controle. Voce vera as metricas da base e os alertas de clientes inativos prontos para resgate via WhatsApp.', href: '/dashboard', action: 'Ver Dashboard', icon: MessageCircle },
 ]
 type Position = { top: number; left: number; width: number; height: number; mobile: boolean }
 
@@ -41,6 +41,15 @@ export function OnboardingTour() {
     })()
   }, [])
 
+  useEffect(() => {
+    if (!visible) return
+    const target = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
+    if (!target) return
+    const highlight = ['!relative', '!z-[60]', '!border-emerald-300', '!bg-emerald-500/20', '!text-emerald-200', 'shadow-[0_0_24px_rgba(52,211,153,0.45)]']
+    target.classList.add(...highlight)
+    return () => target.classList.remove(...highlight)
+  }, [visible, current.key])
+
   useLayoutEffect(() => {
     if (!visible) return
     const frame = window.requestAnimationFrame(updatePosition)
@@ -70,7 +79,8 @@ export function OnboardingTour() {
       <span className={`absolute ${position.mobile ? 'bottom-[-9px] left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-emerald-400/40' : 'left-[-9px] top-7 border-b-8 border-r-8 border-t-8 border-b-transparent border-t-transparent border-r-emerald-400/40'}`} />
       <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-300"><Icon className="h-5 w-5" /></span><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Passo {step + 1} de {steps.length}</p><h2 id="tour-title" className="mt-1 text-base font-bold text-white">{current.title}</h2></div></div><button type="button" onClick={() => void finish('skipped_at')} aria-label="Pular tour" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X className="h-4 w-4" /></button></div>
       <p className="mt-4 text-sm leading-6 text-slate-400">{current.text}</p><div className="mt-4 flex gap-1.5">{steps.map((_, index) => <span key={index} className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-emerald-400' : 'bg-slate-700'}`} />)}</div>
-      <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void finish('skipped_at')} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}{step < steps.length - 1 ? <button type="button" onClick={() => setStep((value) => value + 1)} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">Proximo</button> : <Link href={current.href} onClick={() => void finish('completed_at')} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">{current.action}</Link>}</div></div>
+      <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void finish('skipped_at')} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}{step < steps.length - 1 ? <button type="button" onClick={() => setStep((value) => value + 1)} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">Proximo</button> : <Link href={current.href} onClick={() => void finish('completed_at')} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">Clique no menu iluminado</Link>}</div></div>
     </section>
   </>
 }
+
