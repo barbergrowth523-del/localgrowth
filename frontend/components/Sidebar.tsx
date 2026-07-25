@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -40,6 +40,7 @@ export default function Sidebar() {
               return (
                 <Link
                   key={item.name}
+                  data-tour={item.href === '/clientes' ? 'clients' : item.href === '/agenda' ? 'agenda' : item.href === '/dashboard' ? 'dashboard' : undefined}
                   href={item.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
@@ -73,6 +74,7 @@ export default function Sidebar() {
             return (
               <Link
                 key={item.name}
+                data-tour={item.href === '/clientes' ? 'clients' : item.href === '/agenda' ? 'agenda' : item.href === '/dashboard' ? 'dashboard' : undefined}
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex min-w-[4.5rem] flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition ${
@@ -93,3 +95,4 @@ export default function Sidebar() {
     </>
   )
 }
+
