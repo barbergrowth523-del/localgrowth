@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
@@ -28,7 +28,7 @@ export function OnboardingTour() {
 
   const updatePosition = useCallback(() => {
     const element = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
-    if (!element) { setPosition(null); return }
+    if (!element) return
     const rect = element.getBoundingClientRect()
     const outsideViewport = rect.top < 72 || rect.bottom > window.innerHeight - 32
     if (outsideViewport && scrollRequested.current !== current.key) { scrollRequested.current = current.key; element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); window.setTimeout(() => { scrollRequested.current = null; window.dispatchEvent(new Event('resize')) }, 450); return }
@@ -54,7 +54,7 @@ export function OnboardingTour() {
     if (!visible) return
     const target = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
     if (!target) return
-    const highlight = ['!relative', '!z-[60]', '!border-emerald-300', '!bg-emerald-500/20', '!text-emerald-200', 'shadow-[0_0_24px_rgba(52,211,153,0.45)]']
+    const highlight = ['!relative', '!z-[60]', '!border-emerald-300', '!bg-emerald-500/35', '!text-white', '!opacity-100', '!brightness-125', '!saturate-150', 'shadow-[0_0_32px_rgba(52,211,153,0.7)]']
     target.classList.add(...highlight)
     return () => target.classList.remove(...highlight)
   }, [visible, current.key])
@@ -85,6 +85,7 @@ export function OnboardingTour() {
     const now = new Date().toISOString()
     await createClient().from('lojista_onboarding').upsert({ user_id: userId, completed_at: now, updated_at: now }, { onConflict: 'user_id' })
     window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
+    window.localStorage.removeItem(`prontusfy-onboarding-${userId}-step`)
     setVisible(false)
   }
   async function skip() {
@@ -92,15 +93,25 @@ export function OnboardingTour() {
     const now = new Date().toISOString()
     await createClient().from('lojista_onboarding').upsert({ user_id: userId, skipped_at: now, updated_at: now }, { onConflict: 'user_id' })
     window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
+    window.localStorage.removeItem(`prontusfy-onboarding-${userId}-step`)
     setVisible(false)
   }
   function next() {
     scrollRequested.current = null
     if (typeof current.next !== 'number') { void finish(); return }
-    setPosition(null)
+
     const nextStep = current.next
+    if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(nextStep))
     if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route)
     setStep(nextStep)
+  }
+
+  function back() {
+    if (step === 0) return
+    const previousStep = step - 1
+    if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(previousStep))
+    if (steps[previousStep].route !== current.route) router.push(steps[previousStep].route)
+    setStep(previousStep)
   }
 
   if (!visible || !position) return null
@@ -116,16 +127,17 @@ export function OnboardingTour() {
         : { top: Math.max(16, Math.min(window.innerHeight - 300, position.top)), left: Math.min(window.innerWidth - tooltipWidth - 16, position.left + position.width + 20) }
 
   return <>
-    <div className="pointer-events-none fixed inset-0 z-[55] bg-slate-950/75 backdrop-blur-[1px]" aria-hidden="true" />
+    <div className="pointer-events-none fixed inset-0 z-[55] bg-slate-950/82 backdrop-blur-[2px]" aria-hidden="true" />
     <div className="pointer-events-none fixed z-[56] rounded-xl border-2 border-emerald-300 shadow-[0_0_0_9999px_rgba(2,6,23,0.74),0_0_28px_rgba(52,211,153,0.55)]" style={{ top: position.top - 4, left: position.left - 4, width: position.width + 8, height: position.height + 8 }} />
     <section role="dialog" aria-modal="true" aria-labelledby="tour-title" className="fixed z-[57] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-emerald-400/40 bg-slate-900 p-5 shadow-2xl" style={tooltipStyle}>
       <span className={`absolute ${position.placement === 'top' ? 'bottom-[-9px] left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-emerald-400/40' : position.placement === 'bottom' ? 'left-1/2 top-[-9px] -translate-x-1/2 border-b-8 border-l-8 border-r-8 border-b-emerald-400/40 border-l-transparent border-r-transparent' : position.placement === 'left' ? 'right-[-9px] top-7 border-b-8 border-l-8 border-t-8 border-b-transparent border-l-emerald-400/40 border-t-transparent' : 'left-[-9px] top-7 border-b-8 border-r-8 border-t-8 border-b-transparent border-t-transparent border-r-emerald-400/40'}`} />
       <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-300"><Icon className="h-5 w-5" /></span><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Passo {step + 1} de {steps.length}</p><h2 id="tour-title" className="mt-1 text-base font-bold text-white">{current.title}</h2></div></div><button type="button" onClick={() => void skip()} aria-label="Pular tour" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X className="h-4 w-4" /></button></div>
       <p className="mt-4 text-sm leading-6 text-slate-400">{current.text}</p><div className="mt-4 flex gap-1.5">{steps.map((_, index) => <span key={index} className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-emerald-400' : 'bg-slate-700'}`} />)}</div>
-      <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void skip()} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={() => { scrollRequested.current = null; setPosition(null); setStep((value) => value - 1) }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}<button type="button" onClick={next} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">{current.action}</button></div></div>
+      <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void skip()} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={back} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}<button type="button" onClick={next} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">{current.action}</button></div></div>
     </section>
   </>
 }
+
 
 
 
