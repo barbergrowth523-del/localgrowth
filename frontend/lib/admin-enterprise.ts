@@ -14,6 +14,9 @@ export type CustomerHealth = {
   clientCount: number
   whatsappCount30d: number
   lastLoginAt: string | null
+  aiTokens30d: number
+  aiCost30d: number
+  planMrr: number
 }
 export type ForecastPoint = { month: string; mrr: number; projected: boolean }
 export type AnalyticsOverview = {
@@ -24,12 +27,14 @@ export type AnalyticsOverview = {
   forecast: ForecastPoint[]
   health: CustomerHealth[]
   healthTotals: Record<HealthStatus, number>
+  planPrices: Record<string, number>
 }
 
 type ProfileRow = { id: string; nome_estabelecimento: string | null; plano: string | null; data_vencimento: string | null; acesso_bloqueado: boolean | null; created_at: string }
 type PlanRow = { plan: string; price_monthly: number }
 type ActivityRow = { user_id: string; event_type: string; created_at: string }
 type IdRow = { user_id: string | null; barbearia_id?: string | null }
+type AiUsageRow = { user_id: string; input_tokens: number; output_tokens: number; estimated_cost_brl: number }
 
 const DAY = 86_400_000
 
@@ -59,15 +64,16 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
   const { admin } = await requireSuperAdmin()
   const since30 = new Date(Date.now() - 30 * DAY).toISOString()
   const since90 = new Date(Date.now() - 90 * DAY).toISOString()
-  const [profilesResult, plansResult, clientsResult, sendsResult, activityResult, usersResult] = await Promise.all([
+  const [profilesResult, plansResult, clientsResult, sendsResult, activityResult, usersResult, aiUsageResult] = await Promise.all([
     admin.from('perfis_barbearia').select('id,nome_estabelecimento,plano,data_vencimento,acesso_bloqueado,created_at'),
     admin.from('admin_plan_configs').select('plan,price_monthly').eq('active', true),
     admin.from('clientes').select('user_id'),
     admin.from('historico_disparos').select('barbearia_id').gte('enviado_em', since30),
     admin.from('account_activity_events').select('user_id,event_type,created_at').gte('created_at', since30),
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    admin.from('ai_usage_events').select('user_id,input_tokens,output_tokens,estimated_cost_brl').gte('created_at', since30),
   ])
-  const firstError = profilesResult.error ?? plansResult.error ?? clientsResult.error ?? sendsResult.error ?? activityResult.error ?? usersResult.error
+  const firstError = profilesResult.error ?? plansResult.error ?? clientsResult.error ?? sendsResult.error ?? activityResult.error ?? usersResult.error ?? aiUsageResult.error
   if (firstError) throw new Error('Nao foi possivel calcular a inteligencia operacional.')
 
   const profiles = (profilesResult.data ?? []) as ProfileRow[]
@@ -78,7 +84,11 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
   for (const row of (sendsResult.data ?? []) as IdRow[]) if (row.barbearia_id) sendCounts.set(row.barbearia_id, (sendCounts.get(row.barbearia_id) ?? 0) + 1)
   const loginCounts = new Map<string, number>()
   for (const row of (activityResult.data ?? []) as ActivityRow[]) if (row.event_type === 'login') loginCounts.set(row.user_id, (loginCounts.get(row.user_id) ?? 0) + 1)
-  const users = new Map(usersResult.data.users.map((user) => [user.id, user]))
+  const aiUsage = new Map<string, { tokens: number; cost: number }>()
+  for (const row of (aiUsageResult.data ?? []) as AiUsageRow[]) {
+    const current = aiUsage.get(row.user_id) ?? { tokens: 0, cost: 0 }
+    aiUsage.set(row.user_id, { tokens: current.tokens + Number(row.input_tokens) + Number(row.output_tokens), cost: current.cost + Number(row.estimated_cost_brl) })
+  }  const users = new Map(usersResult.data.users.map((user) => [user.id, user]))
 
   const health = profiles.filter((profile) => users.get(profile.id)?.email !== 'barbergrowth523@gmail.com').map<CustomerHealth>((profile) => {
     const user = users.get(profile.id)
@@ -86,7 +96,9 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
     const clientCount = clientCounts.get(profile.id) ?? 0
     const whatsappCount30d = sendCounts.get(profile.id) ?? 0
     const score = Math.min(100, loginPoints(loginCount30d, user?.last_sign_in_at ?? null) + volumePoints(clientCount, [5, 30, 100], [15, 25, 35]) + volumePoints(whatsappCount30d, [1, 5, 20], [10, 20, 30]))
-    return { id: profile.id, name: profile.nome_estabelecimento?.trim() || 'Barbearia sem nome', email: user?.email ?? 'Email nao informado', plan: String(profile.plano ?? 'starter').toLowerCase(), score, status: healthStatus(score), loginCount30d, clientCount, whatsappCount30d, lastLoginAt: user?.last_sign_in_at ?? null }
+    const plan = String(profile.plano ?? 'starter').toLowerCase()
+    const usage = aiUsage.get(profile.id) ?? { tokens: 0, cost: 0 }
+    return { id: profile.id, name: profile.nome_estabelecimento?.trim() || 'Barbearia sem nome', email: user?.email ?? 'Email nao informado', plan, score, status: healthStatus(score), loginCount30d, clientCount, whatsappCount30d, lastLoginAt: user?.last_sign_in_at ?? null, aiTokens30d: usage.tokens, aiCost30d: usage.cost, planMrr: planPrices.get(plan) ?? 0 }
   }).sort((a, b) => a.score - b.score)
 
   const now = Date.now()
@@ -105,7 +117,7 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
     return { month: formatter.format(new Date(new Date().getFullYear(), new Date().getMonth() + index, 1)).replace('.', ''), mrr: Math.round(value), projected: index > 0 }
   })
   const healthTotals = health.reduce<Record<HealthStatus, number>>((totals, item) => ({ ...totals, [item.status]: totals[item.status] + 1 }), { healthy: 0, risk: 0, inactive: 0 })
-  return { currentMrr, conversionRate, monthlyNetGrowth, projectedMrr12m: forecast[12].mrr, forecast, health, healthTotals }
+  return { currentMrr, conversionRate, monthlyNetGrowth, projectedMrr12m: forecast[12].mrr, forecast, health, healthTotals, planPrices: Object.fromEntries(planPrices) }
 }
 
 export async function getPlansOverview() {

@@ -20,9 +20,11 @@ type Payload = {
   message?: string
   kind?: string
   broadcastId?: string
+  displayMode?: string
 }
 const PLANS = ['starter', 'pro', 'scale']
 const KINDS = ['info', 'success', 'warning', 'critical']
+const DISPLAY_MODES = ['banner', 'popup']
 
 function validOrigin(request: Request) {
   const origin = request.headers.get('origin')
@@ -83,10 +85,10 @@ export async function PATCH(request: Request) {
     if (body.action === 'publish_broadcast') {
       const title = String(body.title ?? '').trim()
       const message = String(body.message ?? '').trim()
-      if (title.length < 3 || title.length > 100 || message.length < 3 || message.length > 1000 || !KINDS.includes(body.kind ?? '') || (body.targetPlan && !PLANS.includes(body.targetPlan))) return NextResponse.json({ error: 'Comunicado invalido.' }, { status: 400 })
-      const { data, error } = await admin.from('admin_broadcasts').insert({ title, message, kind: body.kind, target_plan: body.targetPlan || null, status: 'published', published_at: new Date().toISOString(), expires_at: body.expiresAt || null, created_by: user.id }).select('id').single()
+      if (title.length < 3 || title.length > 100 || message.length < 3 || message.length > 1000 || !KINDS.includes(body.kind ?? '') || !DISPLAY_MODES.includes(body.displayMode ?? 'banner') || (body.targetPlan && !PLANS.includes(body.targetPlan))) return NextResponse.json({ error: 'Comunicado invalido.' }, { status: 400 })
+      const { data, error } = await admin.from('admin_broadcasts').insert({ title, message, kind: body.kind, target_plan: body.targetPlan || null, display_mode: body.displayMode ?? 'banner', status: 'published', published_at: new Date().toISOString(), expires_at: body.expiresAt || null, created_by: user.id }).select('id').single()
       if (error) throw error
-      await audit(admin, user.id, 'publish_broadcast', { broadcastId: data.id, title, targetPlan: body.targetPlan ?? 'all' })
+      await audit(admin, user.id, 'publish_broadcast', { broadcastId: data.id, title, targetPlan: body.targetPlan ?? 'all', displayMode: body.displayMode ?? 'banner' })
       return NextResponse.json({ success: true, id: data.id })
     }
 

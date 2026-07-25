@@ -85,6 +85,7 @@ export function AdminDashboardClient({ initialOverview }: { initialOverview: Adm
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ShopFilter>('all')
   const [operationsTab, setOperationsTab] = useState<'support' | 'audit'>('support')
+  const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({})
 
   const filteredShops = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -158,6 +159,16 @@ export function AdminDashboardClient({ initialOverview }: { initialOverview: Adm
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Erro ao atualizar o chamado.') } finally { setPending('') }
   }
 
+  async function suggestTicketReply(ticket: AdminSupportTicket) {
+    setPending(`ai:${ticket.id}`); setNotice('')
+    try {
+      const response = await fetch('/api/admin/ai/suggest-response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticketId: ticket.id }) })
+      const data = await response.json() as { draft?: string; error?: string }
+      if (!response.ok || !data.draft) throw new Error(data.error ?? 'Nao foi possivel gerar o rascunho.')
+      setAiDrafts((current) => ({ ...current, [ticket.id]: data.draft! }))
+      setNotice('Rascunho de IA gerado. Revise antes de enviar ao lojista.')
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Erro ao gerar rascunho.') } finally { setPending('') }
+  }
   function chargeOnWhatsApp(shop: AdminShop) {
     const phone = cleanPhone(shop.phone)
     if (!phone) return
@@ -241,8 +252,8 @@ export function AdminDashboardClient({ initialOverview }: { initialOverview: Adm
             {overview.supportTickets.map((ticket) => (
               <article key={ticket.id} className="grid gap-4 px-5 py-5 transition hover:bg-slate-800/30 lg:grid-cols-[minmax(190px,0.7fr)_minmax(0,2fr)_220px] lg:items-center">
                 <div><p className="font-semibold text-white">{ticket.shopName}</p><p className="mt-1 text-xs text-slate-500">{ticket.email ?? 'Email nao informado'}</p><p className="mt-2 font-mono text-[10px] text-slate-600">#{ticket.id.slice(0, 8)}</p></div>
-                <div><p className="text-sm leading-6 text-slate-300">{ticket.message}</p><p className="mt-2 text-[11px] text-slate-600">{date.format(new Date(ticket.createdAt))} | {ticket.category.replaceAll('_', ' ')}</p></div>
-                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status do chamado<select value={ticket.status === 'respondido' ? 'fechado' : ticket.status} disabled={pending === `ticket:${ticket.id}`} onChange={(event) => void updateTicketStatus(ticket, event.target.value as 'aberto' | 'em_atendimento' | 'fechado')} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm normal-case tracking-normal text-white outline-none focus:border-emerald-500"><option value="aberto">Aberto</option><option value="em_atendimento">Em atendimento</option><option value="fechado">Resolvido</option></select></label>
+                <div><p className="text-sm leading-6 text-slate-300">{ticket.message}</p><p className="mt-2 text-[11px] text-slate-600">{date.format(new Date(ticket.createdAt))} | {ticket.category.replaceAll('_', ' ')}</p>{aiDrafts[ticket.id] && <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">Rascunho sugerido por IA</p><p className="mt-1 text-sm leading-6 text-slate-200">{aiDrafts[ticket.id]}</p></div>}</div>
+                <div className="space-y-3"><button type="button" disabled={pending === `ai:${ticket.id}`} onClick={() => void suggestTicketReply(ticket)} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5 text-xs font-bold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-60"><Sparkles className="h-4 w-4" />{pending === `ai:${ticket.id}` ? 'Gerando rascunho...' : 'Sugerir resposta com IA'}</button><label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status do chamado<select value={ticket.status === 'respondido' ? 'fechado' : ticket.status} disabled={pending === `ticket:${ticket.id}`} onChange={(event) => void updateTicketStatus(ticket, event.target.value as 'aberto' | 'em_atendimento' | 'fechado')} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm normal-case tracking-normal text-white outline-none focus:border-emerald-500"><option value="aberto">Aberto</option><option value="em_atendimento">Em atendimento</option><option value="fechado">Resolvido</option></select></label></div>
               </article>
             ))}
             {!overview.supportTickets.length && <p className="px-5 py-10 text-center text-sm text-slate-500">Nenhum chamado registrado.</p>}
