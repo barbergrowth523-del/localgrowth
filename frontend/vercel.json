@@ -3,5 +3,5 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "git": { "deploymentEnabled": true },
-  "crons": [{ "path": "/api/admin/system/cron", "schedule": "*/5 * * * *" }]
+  "crons": [{ "path": "/api/admin/system/cron", "schedule": "0 12 * * *" }]
 }
