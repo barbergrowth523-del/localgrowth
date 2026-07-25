@@ -31,7 +31,7 @@ export function OnboardingTour() {
     if (!element) { setPosition(null); return }
     const rect = element.getBoundingClientRect()
     const outsideViewport = rect.top < 72 || rect.bottom > window.innerHeight - 32
-    if (outsideViewport && scrollRequested.current !== current.key) { scrollRequested.current = current.key; element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); window.setTimeout(() => { scrollRequested.current = null; updatePosition() }, 450); return }
+    if (outsideViewport && scrollRequested.current !== current.key) { scrollRequested.current = current.key; element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); window.setTimeout(() => { scrollRequested.current = null; window.dispatchEvent(new Event('resize')) }, 450); return }
     const mobile = window.innerWidth < 1024; const wide = rect.width > Math.min(520, window.innerWidth * 0.55); const placement: Position['placement'] = wide ? (rect.bottom + 300 < window.innerHeight ? 'bottom' : 'top') : mobile ? 'top' : 'right'; setPosition({ top: rect.top, left: rect.left, width: rect.width, height: rect.height, placement })
   }, [current.key])
 
@@ -110,6 +110,7 @@ export function OnboardingTour() {
     </section>
   </>
 }
+
 
 
 
