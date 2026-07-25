@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
@@ -15,7 +15,7 @@ const steps: Step[] = [
   { key: 'dashboard', title: 'Dashboard', text: 'Por fim, vamos abrir o Dashboard. Aqui ficam suas principais metricas e os alertas de clientes que precisam voltar.', route: '/dashboard', action: 'Abrir Dashboard', next: 5, icon: MessageCircle },
   { key: 'dashboard-rescue', title: 'Resgate via WhatsApp', text: 'Nesta area voce identifica clientes inativos e pode abrir uma mensagem pronta no WhatsApp para recuperar novos horarios e faturamento.', route: '/dashboard', action: 'Concluir tour', icon: MessageCircle },
 ]
-type Position = { top: number; left: number; width: number; height: number; placement: 'top' | 'right' | 'bottom' }
+type Position = { top: number; left: number; width: number; height: number; placement: 'top' | 'right' | 'bottom' | 'left' }
 
 export function OnboardingTour() {
   const router = useRouter()
@@ -32,7 +32,7 @@ export function OnboardingTour() {
     const rect = element.getBoundingClientRect()
     const outsideViewport = rect.top < 72 || rect.bottom > window.innerHeight - 32
     if (outsideViewport && scrollRequested.current !== current.key) { scrollRequested.current = current.key; element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); window.setTimeout(() => { scrollRequested.current = null; window.dispatchEvent(new Event('resize')) }, 450); return }
-    const mobile = window.innerWidth < 1024; const wide = rect.width > Math.min(520, window.innerWidth * 0.55); const placement: Position['placement'] = wide ? (rect.bottom + 300 < window.innerHeight ? 'bottom' : 'top') : mobile ? 'top' : 'right'; setPosition({ top: rect.top, left: rect.left, width: rect.width, height: rect.height, placement })
+    const mobile = window.innerWidth < 1024; const gap = 20; const tooltipWidth = Math.min(352, window.innerWidth - 32); const tooltipHeight = 276; const rightSpace = window.innerWidth - rect.right; const leftSpace = rect.left; const bottomSpace = window.innerHeight - rect.bottom; const placement: Position['placement'] = mobile ? (bottomSpace >= tooltipHeight + gap ? 'bottom' : 'top') : rightSpace >= tooltipWidth + gap ? 'right' : leftSpace >= tooltipWidth + gap ? 'left' : bottomSpace >= tooltipHeight + gap ? 'bottom' : 'top'; setPosition({ top: rect.top, left: rect.left, width: rect.width, height: rect.height, placement })
   }, [current.key])
 
   useEffect(() => {
@@ -111,19 +111,23 @@ export function OnboardingTour() {
     ? { top: Math.max(16, position.top - 292), left: centeredLeft }
     : position.placement === 'bottom'
       ? { top: Math.min(window.innerHeight - 276, position.top + position.height + 16), left: centeredLeft }
-      : { top: Math.max(16, Math.min(window.innerHeight - 300, position.top)), left: Math.min(window.innerWidth - tooltipWidth - 16, position.left + position.width + 18) }
+      : position.placement === 'left'
+        ? { top: Math.max(16, Math.min(window.innerHeight - 300, position.top)), left: Math.max(16, position.left - tooltipWidth - 20) }
+        : { top: Math.max(16, Math.min(window.innerHeight - 300, position.top)), left: Math.min(window.innerWidth - tooltipWidth - 16, position.left + position.width + 20) }
 
   return <>
     <div className="pointer-events-none fixed inset-0 z-[55] bg-slate-950/75 backdrop-blur-[1px]" aria-hidden="true" />
     <div className="pointer-events-none fixed z-[56] rounded-xl border-2 border-emerald-300 shadow-[0_0_0_9999px_rgba(2,6,23,0.74),0_0_28px_rgba(52,211,153,0.55)]" style={{ top: position.top - 4, left: position.left - 4, width: position.width + 8, height: position.height + 8 }} />
     <section role="dialog" aria-modal="true" aria-labelledby="tour-title" className="fixed z-[57] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-emerald-400/40 bg-slate-900 p-5 shadow-2xl" style={tooltipStyle}>
-      <span className={`absolute ${position.placement === 'top' ? 'bottom-[-9px] left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-emerald-400/40' : position.placement === 'bottom' ? 'left-1/2 top-[-9px] -translate-x-1/2 border-b-8 border-l-8 border-r-8 border-b-emerald-400/40 border-l-transparent border-r-transparent' : 'left-[-9px] top-7 border-b-8 border-r-8 border-t-8 border-b-transparent border-t-transparent border-r-emerald-400/40'}`} />
+      <span className={`absolute ${position.placement === 'top' ? 'bottom-[-9px] left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-emerald-400/40' : position.placement === 'bottom' ? 'left-1/2 top-[-9px] -translate-x-1/2 border-b-8 border-l-8 border-r-8 border-b-emerald-400/40 border-l-transparent border-r-transparent' : position.placement === 'left' ? 'right-[-9px] top-7 border-b-8 border-l-8 border-t-8 border-b-transparent border-l-emerald-400/40 border-t-transparent' : 'left-[-9px] top-7 border-b-8 border-r-8 border-t-8 border-b-transparent border-t-transparent border-r-emerald-400/40'}`} />
       <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-300"><Icon className="h-5 w-5" /></span><div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Passo {step + 1} de {steps.length}</p><h2 id="tour-title" className="mt-1 text-base font-bold text-white">{current.title}</h2></div></div><button type="button" onClick={() => void skip()} aria-label="Pular tour" className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white"><X className="h-4 w-4" /></button></div>
       <p className="mt-4 text-sm leading-6 text-slate-400">{current.text}</p><div className="mt-4 flex gap-1.5">{steps.map((_, index) => <span key={index} className={`h-1 flex-1 rounded-full ${index <= step ? 'bg-emerald-400' : 'bg-slate-700'}`} />)}</div>
       <div className="mt-5 flex items-center justify-between gap-2"><button type="button" onClick={() => void skip()} className="text-xs font-medium text-slate-500 hover:text-white">Pular tour</button><div className="flex gap-2">{step > 0 && <button type="button" onClick={() => { scrollRequested.current = null; setPosition(null); setStep((value) => value - 1) }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Voltar</button>}<button type="button" onClick={next} className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-300">{current.action}</button></div></div>
     </section>
   </>
 }
+
+
 
 
 
