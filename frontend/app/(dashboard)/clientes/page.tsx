@@ -7,11 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 type Frequency = 'semanal' | 'quinzenal' | 'mensal'
 type Client = { id: string; nome: string; telefone: string; ultimoCorte: string; frequencia: Frequency; novo: boolean; dataNascimento?: string }
 
-const initialClients: Client[] = [
-  { id: 'sample-1', nome: 'Pedro Souza', telefone: '(74) 98888-7777', ultimoCorte: '2026-05-15', frequencia: 'mensal', novo: false, dataNascimento: undefined },
-  { id: 'sample-2', nome: 'Lucas Almeida', telefone: '(74) 99111-2233', ultimoCorte: '2026-06-10', frequencia: 'quinzenal', novo: false },
-  { id: 'sample-3', nome: 'Carlos Silva', telefone: '(74) 99999-4455', ultimoCorte: '2026-04-02', frequencia: 'mensal', novo: false, dataNascimento: undefined },
-]
+
 
 const signupPath = '/cadastrar?barbearia=jacobina'
 
@@ -25,7 +21,7 @@ function blobToDataUrl(blob: Blob) {
 }
 
 export default function ClientesPage() {
-  const [clientes, setClientes] = useState<Client[]>(initialClients)
+  const [clientes, setClientes] = useState<Client[]>([])
   const [signupUrl, setSignupUrl] = useState(signupPath)
   const [busca, setBusca] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -60,7 +56,7 @@ export default function ClientesPage() {
       error = fallback.error
     }
     if (error) { setStatus('Erro ao carregar clientes: ' + error.message); return }
-    if (!data?.length) { setClientes(initialClients); return }
+    if (!data?.length) { setClientes([]); return }
     const rows = (data ?? []) as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }>
     setClientes(rows.map((cliente) => ({ id: String(cliente.id), nome: cliente.nome, telefone: cliente.telefone, ultimoCorte: cliente.data_ultimo_corte, frequencia: 'mensal', novo: false, dataNascimento: cliente.data_nascimento ?? undefined })))
   }
@@ -86,7 +82,7 @@ export default function ClientesPage() {
   }
 
   async function deleteClient(cliente: Client) {
-    if (cliente.id.startsWith('sample-')) { setClientes((current) => current.filter((item) => item.id !== cliente.id)); return }
+
     if (!window.confirm('Excluir cliente ' + cliente.nome + '?')) return
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -200,4 +196,7 @@ function formatDate(date: string) {
   if (!date) return 'Nao informado'
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date + 'T12:00:00')).replace('.', '')
 }
+
+
+
 
