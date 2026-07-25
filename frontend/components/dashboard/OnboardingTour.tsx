@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useRouter } from 'next/navigation'
 import { CalendarDays, MessageCircle, QrCode, X } from 'lucide-react'
@@ -43,6 +43,8 @@ export function OnboardingTour() {
       setUserId(user.id)
       const localKey = `prontusfy-onboarding-${user.id}`
       if (window.localStorage.getItem(localKey) === 'done') return
+      const savedStep = Number(window.localStorage.getItem(localKey + '-step'))
+      if (Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length) setStep(savedStep)
       const { data } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
       if (!data?.completed_at && !data?.skipped_at) setVisible(true)
     })()
@@ -65,6 +67,18 @@ export function OnboardingTour() {
     const retry = window.setTimeout(updatePosition, 180)
     return () => { window.cancelAnimationFrame(frame); window.clearTimeout(retry); window.removeEventListener('resize', updatePosition); window.removeEventListener('scroll', updatePosition, true) }
   }, [visible, step, updatePosition])
+
+  useEffect(() => {
+    if (!visible) return
+    const retryTarget = () => {
+      const target = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
+      if (target) updatePosition()
+    }
+    const observer = new MutationObserver(retryTarget)
+    observer.observe(document.body, { childList: true, subtree: true })
+    const retry = window.setInterval(retryTarget, 160)
+    return () => { observer.disconnect(); window.clearInterval(retry) }
+  }, [visible, current.key, updatePosition])
 
   async function finish() {
     if (!userId) return
@@ -110,6 +124,9 @@ export function OnboardingTour() {
     </section>
   </>
 }
+
+
+
 
 
 
