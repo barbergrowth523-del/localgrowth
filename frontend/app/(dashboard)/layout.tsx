@@ -1,10 +1,12 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+﻿import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase/server'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import { SupportChat } from '@/components/support/SupportChat'
 import { GlobalBroadcastBanner } from '@/components/dashboard/GlobalBroadcastBanner'
+import { NotificationCenter } from '@/components/dashboard/NotificationCenter'
+import { OnboardingTour } from '@/components/dashboard/OnboardingTour'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionClient = await createClient()
@@ -35,8 +37,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar />
       <main className="min-w-0 flex-1 overflow-y-auto pb-24 lg:pb-0">{children}</main>
       </div>
+      <NotificationCenter />
+      <OnboardingTour />
       <GlobalBroadcastBanner />
       <SupportChat barbershopName={profile?.nome_estabelecimento} />
     </AuthProvider>
   )
 }
+
+
