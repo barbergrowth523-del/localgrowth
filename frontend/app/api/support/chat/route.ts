@@ -1,88 +1,14 @@
-﻿import { NextResponse } from 'next/server'
+import { generateText } from 'ai'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkPublicRateLimit } from '@/lib/security/rate-limit'
 
-type AccountProfile = {
-  nome_estabelecimento: string | null
-  plano: string | null
-  data_vencimento: string | null
-  renovacao_automatica: boolean | null
-}
-
-const FAQ = [
-  { keys: ['qr code', 'qrcode', 'placa', 'cadastro rapido'], answer: 'Abra Meus Clientes e procure o card Cadastro via QR Code. Ali voce pode copiar o link permanente, baixar a imagem PNG, gerar o PDF ou imprimir a placa para o balcao.' },
-  { keys: ['whatsapp', 'disparo', 'mensagem', 'resgate'], answer: 'Os botoes de WhatsApp abrem uma conversa com a mensagem pronta e o link de agendamento. Voce pode ajustar o template em Configuracoes > Marketing antes de enviar.' },
-  { keys: ['importar', 'csv', 'planilha', 'excel'], answer: 'No Dashboard, clique em Importar planilha CSV. Use colunas de nome, telefone e ultimo corte. O sistema salva os clientes na sua conta e atualiza as metricas.' },
-  { keys: ['agenda', 'agendamento', 'horario', 'marcar corte'], answer: 'Na Agenda voce acompanha os horarios do mes e cria agendamentos manuais. Para receber agendamentos dos clientes, envie o link publico exibido no sistema.' },
-  { keys: ['equipe', 'barbeiro', 'profissional', 'relatorio'], answer: 'Minha Equipe e Relatorios individuais sao recursos do Plano Scale. Neles voce cadastra profissionais e acompanha cortes, faturamento, comissao e satisfacao.' },
-] as const
-
-function normalize(value: string) {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
-}
-
-function formatDate(value: string | null) {
-  if (!value) return 'sem vencimento informado'
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? 'sem vencimento informado' : new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Bahia' }).format(parsed)
-}
-
-function accountAnswer(profile: AccountProfile | null) {
-  const name = profile?.nome_estabelecimento?.trim() || 'sua barbearia'
-  const plan = String(profile?.plano ?? 'starter').replace(/^plano\s+/i, '')
-  const renewal = profile?.renovacao_automatica === false ? 'desativada' : 'ativada'
-  return `${name} esta no Plano ${plan.charAt(0).toUpperCase()}${plan.slice(1)}. O vencimento atual e ${formatDate(profile?.data_vencimento ?? null)} e a renovacao automatica esta ${renewal}.`
-}
-
-function getFaqAnswer(message: string, profile: AccountProfile | null) {
-  const normalized = normalize(message)
-  const asksAccount = ['meu plano', 'minha conta', 'assinatura', 'vencimento', 'renovacao', 'qual plano'].some((key) => normalized.includes(key))
-  if (asksAccount) return accountAnswer(profile)
-  return FAQ.find((entry) => entry.keys.some((key) => normalized.includes(key)))?.answer ?? null
-}
-
-function wantsHuman(message: string) {
-  const normalized = normalize(message)
-  return ['humano', 'atendente', 'suporte', 'chamado', 'falar com alguem'].some((key) => normalized.includes(key))
-}
-
-export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Sessao invalida.' }, { status: 401 })
-
-  if (!await checkPublicRateLimit(request, 'support-chat', 30, 600)) {
-    return NextResponse.json({ error: 'Muitas mensagens. Tente novamente em alguns minutos.' }, { status: 429 })
-  }
-
-  let body: unknown
-  try { body = await request.json() } catch { return NextResponse.json({ error: 'Mensagem invalida.' }, { status: 400 }) }
-  const message = typeof (body as { message?: unknown })?.message === 'string' ? (body as { message: string }).message.trim() : ''
-  if (!message || message.length > 2000) return NextResponse.json({ error: 'Digite uma mensagem de ate 2000 caracteres.' }, { status: 400 })
-
-  const { data, error: profileError } = await supabase.from('perfis_barbearia').select('nome_estabelecimento,plano,data_vencimento,renovacao_automatica').eq('id', user.id).maybeSingle()
-  if (profileError) console.error('[support-chat] profile lookup failed', { code: profileError.code })
-  const profile = data as AccountProfile | null
-  const answer = getFaqAnswer(message, profile)
-  if (answer && !wantsHuman(message)) return NextResponse.json({ reply: answer, handover: false }, { headers: { 'Cache-Control': 'private, no-store' } })
-
-  const { data: ticket, error: ticketError } = await supabase.from('support_tickets').insert({
-    user_id: user.id,
-    barbearia_nome: profile?.nome_estabelecimento?.trim() || 'Barbearia sem nome',
-    user_email: user.email ?? null,
-    mensagem: message,
-    categoria: wantsHuman(message) ? 'suporte_humano' : 'duvida_complexa',
-    contexto: { plano: profile?.plano ?? 'starter', vencimento: profile?.data_vencimento ?? null, renovacao_automatica: profile?.renovacao_automatica ?? true },
-  }).select('id').single()
-
-  if (ticketError) {
-    console.error('[support-chat] handover failed', { code: ticketError.code, details: ticketError.details })
-    return NextResponse.json({ error: 'Nao foi possivel registrar o chamado agora.' }, { status: 500 })
-  }
-
-  return NextResponse.json({
-    reply: 'Essa duvida precisa de uma analise humana. Seu chamado foi registrado e o suporte respondera nos horarios de atendimento, durante o almoco ou a noite.',
-    handover: true,
-    ticketId: ticket.id,
-  }, { headers: { 'Cache-Control': 'private, no-store' } })
-}
+type AccountProfile = { nome_estabelecimento: string | null; plano: string | null; data_vencimento: string | null; renovacao_automatica: boolean | null }
+const KNOWLEDGE = ['QR Code: em Meus Clientes, o lojista copia o link permanente, baixa PNG/PDF ou imprime a placa de cadastro.', 'Resgate: no Dashboard, filtre clientes em risco e use WhatsApp para abrir a mensagem com o link de agendamento.', 'Agenda: a pagina Agenda permite criar horarios manuais e acompanhar agendamentos do link publico.', 'Marketing: em Configuracoes > Marketing, o lojista ajusta o template de resgate via WhatsApp.', 'Planos: Starter inclui QR Code e disparos manuais; Pro adiciona clientes ilimitados e resgate automatico; Scale inclui equipe e relatorios individuais.']
+function normalize(value: string) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase() }
+function formatDate(value: string | null) { if (!value) return 'sem vencimento informado'; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? 'sem vencimento informado' : new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Bahia' }).format(parsed) }
+function accountContext(profile: AccountProfile | null) { const name = profile?.nome_estabelecimento?.trim() || 'sua barbearia'; const plan = String(profile?.plano ?? 'starter').replace(/^plano\s+/i, ''); const renewal = profile?.renovacao_automatica === false ? 'desativada' : 'ativada'; return `${name}; Plano ${plan}; vencimento ${formatDate(profile?.data_vencimento ?? null)}; renovacao automatica ${renewal}` }
+function needsExecutiveHandover(message: string) { const value = normalize(message); return ['pagamento recusado', 'pagamento falhou', 'cobranca duplicada', 'nao consigo acessar', 'nao consigo entrar', 'sistema fora', 'sistema caiu', 'erro critico', 'dados sumiram', 'vazamento'].some((key) => value.includes(key)) }
+function fallbackReply(message: string, profile: AccountProfile | null) { const value = normalize(message); if (['plano', 'assinatura', 'vencimento', 'renovacao'].some((key) => value.includes(key))) return `**Visao da sua conta**\n${accountContext(profile)}.\n\nSe quiser, posso orientar voce na pagina Assinatura para ajustar plano ou renovacao.`; if (value.includes('qr') || value.includes('cadastro')) return '**Configuracao do QR Code**\n1. Abra Meus Clientes.\n2. Localize Cadastro via QR Code.\n3. Copie o link ou baixe a placa para o balcao.\n\nAssim sua base cresce sem cadastro manual.'; if (value.includes('resgatar') || value.includes('whatsapp') || value.includes('cliente')) return '**Resgate de clientes**\n1. Abra o Dashboard e localize clientes em risco.\n2. Revise a mensagem sugerida.\n3. Clique em WhatsApp para enviar com o link de agendamento.\n\nPriorize quem esta ha mais tempo sem voltar.'; return 'Posso orientar voce em **resgate de clientes**, **QR Code**, **Agenda**, **WhatsApp** ou **plano atual**. Qual frente voce quer acelerar primeiro?' }
+async function conciergeReply(message: string, profile: AccountProfile | null) { const fallback = fallbackReply(message, profile); if (!process.env.OPENAI_API_KEY && !process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) return fallback; const prompt = `Voce e o Concierge Prontusfy, especialista executiva em crescimento, agendamentos e gestao de barbearias. Responda em portugues do Brasil de forma acolhedora, comercial e pratica. Oriente passo a passo apenas com recursos confirmados na base. Use no maximo 3 blocos curtos, listas numeradas quando ajudar e destaque termos importantes com **negrito**. Nunca se chame de robo, bot ou suporte tecnico. Nao invente integracoes, precos, prazos ou acoes executadas.\n\nConta atual: ${accountContext(profile)}\n\nBase de conhecimento:\n${KNOWLEDGE.map((item) => `- ${item}`).join('\n')}\n\nPergunta do lojista: ${message}`; try { const { text } = await generateText({ model: 'openai/gpt-5.4', prompt }); return text.trim().slice(0, 1800) || fallback } catch (error) { console.error('[concierge] ai fallback', error instanceof Error ? error.message : error); return fallback } }
+export async function POST(request: Request) { const supabase = await createClient(); const { data: { user }, error: authError } = await supabase.auth.getUser(); if (authError || !user) return NextResponse.json({ error: 'Sessao invalida.' }, { status: 401 }); if (!await checkPublicRateLimit(request, 'concierge-chat', 30, 600)) return NextResponse.json({ error: 'Muitas mensagens. Tente novamente em alguns minutos.' }, { status: 429 }); let body: unknown; try { body = await request.json() } catch { return NextResponse.json({ error: 'Mensagem invalida.' }, { status: 400 }) }; const message = typeof (body as { message?: unknown })?.message === 'string' ? (body as { message: string }).message.trim() : ''; if (!message || message.length > 2000) return NextResponse.json({ error: 'Digite uma mensagem de ate 2000 caracteres.' }, { status: 400 }); const { data, error: profileError } = await supabase.from('perfis_barbearia').select('nome_estabelecimento,plano,data_vencimento,renovacao_automatica').eq('id', user.id).maybeSingle(); if (profileError) console.error('[concierge] profile lookup failed', { code: profileError.code }); const profile = data as AccountProfile | null; if (!needsExecutiveHandover(message)) return NextResponse.json({ reply: await conciergeReply(message, profile), handover: false }, { headers: { 'Cache-Control': 'private, no-store' } }); const { data: ticket, error: ticketError } = await supabase.from('support_tickets').insert({ user_id: user.id, barbearia_nome: profile?.nome_estabelecimento?.trim() || 'Barbearia sem nome', user_email: user.email ?? null, mensagem: message, categoria: 'incidente_critico', contexto: { plano: profile?.plano ?? 'starter', vencimento: profile?.data_vencimento ?? null, renovacao_automatica: profile?.renovacao_automatica ?? true, origem: 'concierge' } }).select('id').single(); if (ticketError) { console.error('[concierge] handover failed', { code: ticketError.code, details: ticketError.details }); return NextResponse.json({ error: 'Nao foi possivel registrar a solicitacao agora.' }, { status: 500 }) }; return NextResponse.json({ reply: `Entendi perfeitamente. Acionei nosso especialista senior aqui no comando central e ele retornara em breve. Seu protocolo e #${ticket.id.slice(0, 8)}.`, handover: true, ticketId: ticket.id }, { headers: { 'Cache-Control': 'private, no-store' } }) }

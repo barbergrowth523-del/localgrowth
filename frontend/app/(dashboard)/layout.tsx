@@ -11,8 +11,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) redirect('/login')
 
-  const profileResult = await sessionClient.from('perfis_barbearia').select('plano').eq('id', user.id).maybeSingle()
-  const profile = profileResult.data as { plano?: string | null } | null
+  const profileResult = await sessionClient.from('perfis_barbearia').select('plano,nome_estabelecimento').eq('id', user.id).maybeSingle()
+  const profile = profileResult.data as { plano?: string | null; nome_estabelecimento?: string | null } | null
   const initialPlan = String(profile?.plano ?? 'starter').trim().toLowerCase().replace(/^plano\s+/, '') || 'starter'
   const initialSubscriptionActive = initialPlan !== 'free' && initialPlan !== 'gratuito'
 
@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="min-w-0 flex-1 overflow-y-auto pb-24 lg:pb-0">{children}</main>
       </div>
       <GlobalBroadcastBanner />
-      <SupportChat />
+      <SupportChat barbershopName={profile?.nome_estabelecimento} />
     </AuthProvider>
   )
 }
