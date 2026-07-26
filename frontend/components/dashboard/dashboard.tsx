@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, CalendarDays, CheckCircle2, ChevronRight, Clipboard, FileUp, Cake, LoaderCircle, MessageCircle, Search, Sparkles, User, Users, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -9,9 +10,6 @@ type Client = { id: string; name: string; phone: string; last_cut_at: string; st
 const demoClient: Client = { id: 'tour-demo-client', name: 'Cliente de demonstracao', phone: '5574999990000', last_cut_at: '2026-05-01', frequency: 'mensal', status_calculado: 'sumido' }
 const isOverdue = (date: string) => (Date.now() - new Date(`${date}T12:00:00`).getTime()) / 86400000 > 30
 const formatDate = (date: string) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T12:00:00`)).replace('.', '')
-const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL ?? ''
-const bookingPath = '/agendar?barbearia=jacobina'
-const getBookingUrl = () => bookingUrl || (typeof window !== 'undefined' ? window.location.origin + bookingPath : bookingPath)
 const countLabel = (count: number, singular: string, plural: string) => `${count} ${count === 1 ? singular : plural}`
 
 function useCountUp(target: number, duration = 650) {
@@ -33,33 +31,39 @@ function useCountUp(target: number, duration = 650) {
   return value
 }
 
-function buildWhatsAppMessage(name: string) {
-  const callToAction = ' Escolha seu horario direto aqui: ' + getBookingUrl()
+function buildWhatsAppMessage(name: string, bookingUrl: string) {
+  const callToAction = bookingUrl ? ' Escolha seu horario direto aqui: ' + bookingUrl : ''
   return 'Oi, ' + name.split(' ')[0] + '! Tudo bem? Ja faz um tempinho desde seu ultimo corte. Quer reservar um horario?' + callToAction
 }
 export function Dashboard({ userEmail }: { userEmail: string }) {
   const fallbackName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Usuario').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
   const [profileName, setProfileName] = useState('')
-  const [tourDemo, setTourDemo] = useState(false)
+  const searchParams = useSearchParams()
+  const tourDemo = searchParams.get('tour') === '1' && searchParams.get('tourStep') === '5'
   const [planLabel, setPlanLabel] = useState('Plano Free')
+  const [bookingLink, setBookingLink] = useState('')
   const displayName = profileName || fallbackName
   const firstName = displayName.split(' ')[0] || 'Usuario'
-  useEffect(() => { const syncTourDemo = () => { const params = new URLSearchParams(window.location.search); setTourDemo(params.get('tour') === '1' && params.get('tourStep') === '5') }; syncTourDemo(); window.addEventListener('prontusfy-tour-ended', syncTourDemo); return () => window.removeEventListener('prontusfy-tour-ended', syncTourDemo) }, [])
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
   async function loadClients() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
-    const primaryProfile = await supabase.from('perfis_barbearia').select('nome_estabelecimento,plano').eq('id', user.id).maybeSingle()
+    const [primaryProfile, result] = await Promise.all([
+      supabase.from('perfis_barbearia').select('nome_estabelecimento,plano,slug').eq('id', user.id).maybeSingle(),
+      supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true }),
+    ])
     const profile = primaryProfile.data as Record<string, unknown> | null
     const profileValue = (keys: string[]) => keys.map((key) => profile?.[key]).find((value) => typeof value === 'string' && value.trim()) as string | undefined
     const savedName = profileValue(['nome_estabelecimento', 'nome', 'nome_completo', 'name', 'nome_barbearia', 'barbearia_nome'])
     const savedPlan = profileValue(['plano', 'plan', 'nome_plano'])
+    const savedSlug = profileValue(['slug'])
     if (savedName) setProfileName(savedName.trim())
+    if (savedSlug) setBookingLink(window.location.origin + '/agendar?barbearia=' + encodeURIComponent(savedSlug))
     if (savedPlan) {
       const cleanPlan = savedPlan.replace(/^plano\s+/i, '').trim()
       setPlanLabel('Plano ' + (cleanPlan ? cleanPlan.charAt(0).toUpperCase() + cleanPlan.slice(1).toLowerCase() : 'Free'))
-    }    const result = await supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true })
+    }
     let data = result.data as Array<{ id: string; nome: string; telefone: string; data_ultimo_corte: string; data_nascimento?: string | null }> | null
     let error = result.error
     const errorMessage = error?.message?.toLowerCase() ?? ''
@@ -119,8 +123,8 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"><MoneyOnTableCard value={atRisk} sumidoCount={sumidoCount} /><RoiBadge multiple={roiMultiple} recoveries={estimatedRecoveries} /><Stat icon={<Users size={18} />} label="Total de clientes" value={dashboardClients.length} /><Stat icon={<CalendarDays size={18} />} label="Cortes este mes" value={dashboardClients.filter(c => new Date(c.last_cut_at).getMonth() === new Date().getMonth()).length} /></div>
       <BirthdayPanel clients={dashboardClients} />
       <HealthBaseChart clients={dashboardClients} />
-      <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-sm"><div className="flex flex-col justify-between gap-4 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center"><div><h2 className="font-semibold">Sua base de clientes</h2><p className="mt-1 text-sm text-slate-500">Clientes ha mais de 30 dias aparecem destacados.</p></div><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-500" /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente" className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 sm:w-56" /></div><select value={frequencyFilter} onChange={event => setFrequencyFilter(event.target.value)} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-300 outline-none focus:border-slate-900"><option value="todos">Todas as frequencias</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-950 text-xs font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-4 font-medium">Cliente</th><th className="px-5 py-4 font-medium">Telefone</th><th className="px-5 py-4 font-medium">Ultimo corte</th><th className="px-5 py-4 font-medium">Status</th><th className="px-5 py-4" /></tr></thead><tbody className="divide-y divide-slate-800">{filteredClientes.length ? filteredClientes.map(client => <ClientRow key={client.id} client={client} onSelect={() => setSelectedClient(client)} />) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado com estes filtros.</td></tr>}</tbody></table></div>{!clients.length && !tourDemo && <p className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500">Sua base esta vazia. Importe sua planilha ou cadastre um cliente para comecar.</p>}</section>
-    </div><ClientDrawer client={selectedClient} onClose={() => setSelectedClient(null)} /></main>
+      <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-sm"><div className="flex flex-col justify-between gap-4 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center"><div><h2 className="font-semibold">Sua base de clientes</h2><p className="mt-1 text-sm text-slate-500">Clientes ha mais de 30 dias aparecem destacados.</p></div><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-500" /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente" className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 sm:w-56" /></div><select value={frequencyFilter} onChange={event => setFrequencyFilter(event.target.value)} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-300 outline-none focus:border-slate-900"><option value="todos">Todas as frequencias</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-950 text-xs font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-4 font-medium">Cliente</th><th className="px-5 py-4 font-medium">Telefone</th><th className="px-5 py-4 font-medium">Ultimo corte</th><th className="px-5 py-4 font-medium">Status</th><th className="px-5 py-4" /></tr></thead><tbody className="divide-y divide-slate-800">{filteredClientes.length ? filteredClientes.map(client => <ClientRow key={client.id} client={client} bookingUrl={bookingLink} onSelect={() => setSelectedClient(client)} />) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado com estes filtros.</td></tr>}</tbody></table></div>{!clients.length && !tourDemo && <p className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500">Sua base esta vazia. Importe sua planilha ou cadastre um cliente para comecar.</p>}</section>
+    </div><ClientDrawer client={selectedClient} bookingUrl={bookingLink} onClose={() => setSelectedClient(null)} /></main>
 }
 function MoneyOnTableCard({ value, sumidoCount }: { value: number; sumidoCount: number }) {
   const displayedValue = useCountUp(value)
@@ -183,7 +187,7 @@ function HealthBaseChart({ clients }: { clients: Client[] }) {
   return <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900 p-4 shadow-sm"><h3 className="mb-3 text-sm font-semibold text-slate-300">Saude da Base de Clientes</h3><div className="mb-2 flex h-3 w-full overflow-hidden rounded-full"><div className="bg-emerald-500" style={{ width: retained + '%' }} /><div className="bg-amber-400" style={{ width: alert + '%' }} /><div className="bg-rose-500" style={{ width: risk + '%' }} /></div><div className="flex justify-between text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />{retained}% Retidos</span><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-amber-400" />{alert}% Em Alerta</span><span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full bg-rose-500" />{risk}% Em Risco</span></div></div>
 }
 
-function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
+function ClientDrawer({ client, bookingUrl, onClose }: { client: Client | null; bookingUrl: string; onClose: () => void }) {
   const [history, setHistory] = useState<Array<{ id: string; mensagem_enviada: string; status: string; enviado_em: string }>>([])
   const [note, setNote] = useState('')
   const [message, setMessage] = useState('')
@@ -192,9 +196,9 @@ function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () 
   useEffect(() => {
     if (!client) return
     setNote(window.localStorage.getItem('prontusfy-note-' + client.id) ?? '')
-    setMessage(buildWhatsAppMessage(client.name))
+    setMessage(buildWhatsAppMessage(client.name, bookingUrl))
     createClient().from('historico_disparos').select('id,mensagem_enviada,status,enviado_em').eq('cliente_id', client.id).order('enviado_em', { ascending: false }).then(({ data }) => setHistory((data ?? []) as Array<{ id: string; mensagem_enviada: string; status: string; enviado_em: string }>))
-  }, [client])
+  }, [client, bookingUrl])
   if (!client) return null
   const clientId = client.id
   const clientName = client.name
@@ -212,7 +216,7 @@ function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () 
   }
   return <div className="fixed inset-0 z-50 flex justify-end"><button aria-label="Fechar detalhes" onClick={onClose} className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm" /><aside className="relative h-full w-full max-w-md overflow-y-auto border-l border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Detalhes do cliente</p><h2 className="mt-2 text-2xl font-semibold text-white">{client.name}</h2><p className="mt-1 text-sm text-slate-500">{formatPhone(client.phone)}</p></div><button onClick={onClose} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-950 hover:text-white"><X size={18} /></button></div><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-lg bg-slate-950 p-3"><p className="text-xs text-slate-500">Ultimo corte</p><p className="mt-1 text-sm font-semibold text-white">{formatDate(client.last_cut_at)}</p></div><div className="rounded-lg bg-slate-950 p-3"><p className="text-xs text-slate-500">Frequencia</p><p className="mt-1 text-sm font-semibold capitalize text-white">{client.frequency ?? 'Nao informada'}</p></div></div><div className="mt-6"><h3 className="font-semibold text-white">Mensagem de reativacao</h3><div className="mt-3 flex gap-2"><button onClick={() => generateVariation('amigavel')} className={'rounded-full px-3 py-1.5 text-xs font-semibold ' + (tone === 'amigavel' ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-300')}>Amigavel</button><button onClick={() => generateVariation('oferta')} className={'rounded-full px-3 py-1.5 text-xs font-semibold ' + (tone === 'oferta' ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-300')}>Oferta</button><button onClick={() => generateVariation('direto')} className={'rounded-full px-3 py-1.5 text-xs font-semibold ' + (tone === 'direto' ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-300')}>Direto</button></div><textarea value={message} onChange={event => setMessage(event.target.value)} className="mt-3 min-h-28 w-full resize-none rounded-lg border border-slate-800 p-3 text-sm leading-6 outline-none focus:border-slate-900" /><div className="mt-3 flex gap-2"><button disabled={generating} onClick={() => generateVariation()} className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60">{generating ? <LoaderCircle size={14} className="animate-spin" /> : <Sparkles size={14} />}Gerar variacao com IA</button><a href={'https://wa.me/' + client.phone + '?text=' + encodeURIComponent(message)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"><MessageCircle size={14} />Enviar</a></div></div><div className="mt-6"><h3 className="font-semibold text-white">Anotacoes</h3><textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Ex.: prefere degrade baixo..." className="mt-3 min-h-24 w-full resize-none rounded-lg border border-slate-800 p-3 text-sm outline-none focus:border-slate-900" /><button onClick={saveNote} className="mt-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">Salvar anotacao</button></div><div className="mt-8"><div className="flex items-center justify-between"><h3 className="font-semibold text-white">Historico de disparos</h3><ChevronRight size={16} className="text-slate-400" /></div>{history.length ? <div className="mt-3 space-y-3">{history.map(item => <div key={item.id} className="rounded-lg border border-slate-800 bg-slate-950 p-3"><div className="flex justify-between gap-3 text-xs text-slate-500"><span className="capitalize">{item.status}</span><span>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(item.enviado_em))}</span></div><p className="mt-2 text-sm text-slate-300">{item.mensagem_enviada}</p></div>)}</div> : <p className="mt-3 rounded-lg border border-dashed border-slate-800 px-3 py-4 text-sm text-slate-500">Nenhum disparo registrado ainda.</p>}</div></aside></div>
 }
-function ClientRow({ client, onSelect }: { client: Client; onSelect: () => void }) {
+function ClientRow({ client, bookingUrl, onSelect }: { client: Client; bookingUrl: string; onSelect: () => void }) {
   const status = getRetentionStatus(client)
   const statusStyles = {
     sumido: 'bg-rose-500/10 text-rose-300 border border-rose-500/20 font-medium',
@@ -228,7 +232,7 @@ function ClientRow({ client, onSelect }: { client: Client; onSelect: () => void 
     <td className="px-5 py-4 text-slate-400">{formatPhone(client.phone)}</td>
     <td className="px-5 py-4 text-slate-400">{formatDate(client.last_cut_at)}</td>
     <td className="px-5 py-4"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ' + statusStyles + (status === 'sumido' ? ' animate-pulse' : '')}>{status === 'sumido' ? <AlertCircle size={13} /> : status === 'alerta' ? <AlertCircle size={13} /> : <CheckCircle2 size={13} />}{statusLabel}</span></td>
-    <td className="px-5 py-4 text-right"><a data-tour={vipAtRisk ? "dashboard-rescue" : undefined} onClick={event => event.stopPropagation()} href={'https://wa.me/' + client.phone + '?text=' + encodeURIComponent(buildWhatsAppMessage(client.name))} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700"><MessageCircle size={14} /> WhatsApp</a></td>
+    <td className="px-5 py-4 text-right"><a data-tour={vipAtRisk ? "dashboard-rescue" : undefined} onClick={event => event.stopPropagation()} href={'https://wa.me/' + client.phone + '?text=' + encodeURIComponent(buildWhatsAppMessage(client.name, bookingUrl))} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-emerald-700"><MessageCircle size={14} /> WhatsApp</a></td>
   </tr>
 }
 

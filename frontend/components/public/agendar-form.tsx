@@ -9,10 +9,7 @@ type Barber = { id: string; nome: string }
 type Availability = { capacity: number; booked: Record<string, number>; barbers: Barber[] }
 
 const weekLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
-const fallbackServices: Service[] = [
-  { id: 'fallback-corte', nome: 'Corte', preco: 60, duracao_minutos: 30 },
-  { id: 'fallback-barba', nome: 'Barba', preco: 40, duracao_minutos: 30 },
-]
+
 const timeOptions = ['09:00', '09:30', '10:00', '10:30', '11:00', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00']
 
 function dateKey(date: Date) {
@@ -38,7 +35,7 @@ export default function PublicBookingForm({ barbearia }: { barbearia: string }) 
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [success, setSuccess] = useState(false)
-  const nomeBarbearia = useMemo(() => 'Barbearia ' + (barbearia || 'Jacobina').replace(/[-_]+/g, ' '), [barbearia])
+  const [nomeBarbearia, setNomeBarbearia] = useState('Barbearia')
 
   const days = useMemo<DayOption[]>(() => Array.from({ length: 7 }, (_, index) => {
     const date = new Date()
@@ -54,15 +51,15 @@ export default function PublicBookingForm({ barbearia }: { barbearia: string }) 
     setLoadingServices(true)
     fetch('/api/servicos?barbearia=' + encodeURIComponent(barbearia))
       .then((response) => response.ok ? response.json() : { services: [] })
-      .then((data: { services?: Service[] }) => {
-        const loaded = data.services ?? []
-        const available = loaded.length ? loaded : fallbackServices
+      .then((data: { services?: Service[]; barbershop?: { name?: string } }) => {
+        const available = data.services ?? []
         setServices(available)
+        if (data.barbershop?.name) setNomeBarbearia(data.barbershop.name)
         if (available.length) setServicoId((current) => current || available[0].id)
       })
       .catch(() => {
-        setServices(fallbackServices)
-        setServicoId((current) => current || fallbackServices[0].id)
+        setServices([])
+        setMessage('Nao foi possivel carregar os servicos agora.')
       })
       .finally(() => setLoadingServices(false))
   }, [barbearia])

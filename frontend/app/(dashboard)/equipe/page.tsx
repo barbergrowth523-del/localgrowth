@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Phone, Plus, Trash2, UserRound, UsersRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ScalePaywall } from '@/components/ScalePaywall'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 type TeamMember = {
   id: string
@@ -39,11 +40,13 @@ export default function EquipePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
+  const { permissions } = useAuth()
 
   useEffect(() => {
+    if (!permissions.canManageTeam) { setLoading(false); return }
     void loadMembers()
     void loadPerformance()
-  }, [])
+  }, [permissions.canManageTeam])
 
   async function loadMembers() {
     setLoading(true)
@@ -66,24 +69,33 @@ export default function EquipePage() {
     setLoading(false)
   }
 
-async function loadPerformance() {
+  async function loadPerformance() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const [appointmentsResult, servicesResult] = await Promise.all([
-      supabase.from('agendamentos').select('equipe_id,servico_id,status').eq('user_id', user.id),
+      supabase.from('agendamentos').select('equipe_id,servico_id,status').eq('user_id', user.id).eq('status', 'Concluido'),
       supabase.from('servicos').select('id,preco').eq('user_id', user.id),
     ])
+    const error = appointmentsResult.error ?? servicesResult.error
+    if (error) { setStatus('Erro ao carregar desempenho: ' + error.message); return }
     const prices = new Map((servicesResult.data ?? []).map((service) => [service.id, Number(service.preco)]))
-    const performance = new Map((appointmentsResult.data ?? []).map((appointment) => [appointment.equipe_id, appointment]))
-    return { prices, performance }
+    const totals: Record<string, Performance> = {}
+    for (const appointment of appointmentsResult.data ?? []) {
+      if (!appointment.equipe_id) continue
+      const current = totals[appointment.equipe_id] ?? { cortes: 0, faturamento: 0 }
+      current.cortes += 1
+      current.faturamento += appointment.servico_id ? prices.get(appointment.servico_id) ?? 0 : 0
+      totals[appointment.equipe_id] = current
+    }
+    setPerformance(totals)
   }
   async function saveMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const commission = Number(form.comissao.replace(',', '.'))
 
-    if (!form.nome.trim() || !form.email.trim() || form.senha.length < 6 || !Number.isFinite(commission) || commission < 0 || commission > 100) {
-      setStatus('Informe nome, email, senha com 6 caracteres e comissao entre 0 e 100.')
+    if (!form.nome.trim() || !form.email.trim() || form.senha.length < 8 || !Number.isFinite(commission) || commission < 0 || commission > 100) {
+      setStatus('Informe nome, email, senha com 8 caracteres e comissao entre 0 e 100.')
       return
     }
 
@@ -114,22 +126,16 @@ async function loadPerformance() {
   async function deleteMember(member: TeamMember) {
     if (!window.confirm('Apagar profissional ' + member.nome + '?')) return
 
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setStatus('Sua sessao expirou. Entre novamente.')
-      return
-    }
-
-    const { error } = await supabase
-      .from('equipe')
-      .delete()
-      .eq('id', member.id)
-      .eq('user_id', user.id)
-
-    if (error) setStatus('Erro ao apagar profissional: ' + error.message)
+    const response = await fetch('/api/equipe', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId: member.id }),
+    })
+    const data = await response.json() as { error?: string }
+    if (!response.ok) setStatus(data.error ?? 'Erro ao apagar profissional.')
     else {
       setMembers((current) => current.filter((item) => item.id !== member.id))
+      setPerformance((current) => { const next = { ...current }; delete next[member.id]; return next })
       setStatus('Profissional removido com sucesso!')
     }
   }
@@ -165,7 +171,7 @@ async function loadPerformance() {
               <form onSubmit={saveMember} className="space-y-4">
                 <label className="block text-sm text-slate-300">Nome completo<input required value={form.nome} onChange={(event) => setForm({ ...form, nome: event.target.value })} placeholder="Ex: Samuel Santos" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label>
                 <label className="block text-sm text-slate-300">Telefone<input type="tel" value={form.telefone} onChange={(event) => setForm({ ...form, telefone: event.target.value })} placeholder="(00) 00000-0000" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label>
-                <label className="block text-sm text-slate-300">Email de Acesso<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="profissional@email.com" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Senha<input required minLength={6} type="password" value={form.senha} onChange={(event) => setForm({ ...form, senha: event.target.value })} placeholder="Minimo de 6 caracteres" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Comissao (%)<input required min="0" max="100" step="0.01" type="number" value={form.comissao} onChange={(event) => setForm({ ...form, comissao: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none focus:border-emerald-500" /></label>
+                <label className="block text-sm text-slate-300">Email de Acesso<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="profissional@email.com" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Senha<input required minLength={8} type="password" value={form.senha} onChange={(event) => setForm({ ...form, senha: event.target.value })} placeholder="Minimo de 8 caracteres" className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" /></label><label className="block text-sm text-slate-300">Comissao (%)<input required min="0" max="100" step="0.01" type="number" value={form.comissao} onChange={(event) => setForm({ ...form, comissao: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 text-sm text-white outline-none focus:border-emerald-500" /></label>
                 <button disabled={saving} type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"><Plus className="h-4 w-4" />{saving ? 'Salvando...' : 'Cadastrar profissional'}</button>
               </form>
             </section>

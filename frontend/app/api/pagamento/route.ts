@@ -2,6 +2,7 @@ import { BRAND_NAME } from '@/lib/brand'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkPublicRateLimit } from '@/lib/security/rate-limit'
+import { hasValidSameOrigin, readJsonBody } from '@/lib/security/request'
 
 const ASAAS_URL = process.env.ASAAS_API_URL ?? 'https://api.asaas.com/v3'
 
@@ -35,6 +36,9 @@ async function asaasRequest(path: string, init: RequestInit) {
 }
 
 export async function POST(request: Request) {
+    if (!hasValidSameOrigin(request)) {
+      return NextResponse.json({ success: false, error: 'Origem invalida.' }, { status: 403 })
+    }
     const sessionClient = await createClient()
     const { data: { user } } = await sessionClient.auth.getUser()
     if (!user) {
@@ -42,7 +46,8 @@ export async function POST(request: Request) {
     }
 
   try {
-    const body = await request.json() as PaymentBody
+    const body = await readJsonBody<PaymentBody>(request)
+    if (!body) return NextResponse.json({ success: false, error: 'Dados de pagamento invalidos.' }, { status: 400 })
 
     const allowed = await checkPublicRateLimit(request, 'pagamento', 10, 600)
     if (!allowed) {

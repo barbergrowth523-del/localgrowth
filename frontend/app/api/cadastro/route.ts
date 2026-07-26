@@ -1,10 +1,15 @@
-﻿import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { checkPublicRateLimit } from '@/lib/security/rate-limit'
+import { readJsonBody } from '@/lib/security/request'
+import { resolvePublicBarbershop } from '@/lib/public-barbershop'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const permanentBarbearias: Record<string, string | undefined> = { jacobina: process.env.BARBEARIA_JACOBINA_ID || 'a2ce084d-84bd-426e-9ec4-cc0f961df556' }
-function resolveBarbeariaId(value: string) { return permanentBarbearias[value.trim().toLowerCase()] }
+function isRealDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(value + 'T12:00:00Z')
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
 
 export async function POST(request: Request) {
   try {
@@ -12,20 +17,23 @@ export async function POST(request: Request) {
     if (!allowed) {
       return NextResponse.json({ error: 'Muitas tentativas. Tente novamente mais tarde.' }, { status: 429 })
     }
-    const body = await request.json() as { barbearia?: string; nome?: string; telefone?: string; dataNascimento?: string; servicoPreferidoId?: string | null }
+    const body = await readJsonBody<{ barbearia?: string; nome?: string; telefone?: string; dataNascimento?: string; servicoPreferidoId?: string | null }>(request)
+    if (!body) return NextResponse.json({ error: 'Dados invalidos.' }, { status: 400 })
     const barbearia = body.barbearia?.trim() ?? ''
     const nome = body.nome?.trim() ?? ''
     const telefone = body.telefone?.replace(/\D/g, '') ?? ''
     const dataNascimento = body.dataNascimento?.trim() || null
     const servicoPreferidoId = body.servicoPreferidoId?.trim() || null
-    const barbeariaId = resolveBarbeariaId(barbearia)
-    if (!barbeariaId || !uuidPattern.test(barbeariaId)) return NextResponse.json({ error: 'Link de cadastro invalido.' }, { status: 400 })
+    const shop = await resolvePublicBarbershop(barbearia)
+    const barbeariaId = shop?.id
+    if (!barbeariaId) return NextResponse.json({ error: 'Link de cadastro invalido.' }, { status: 400 })
     if (nome.length < 2 || nome.length > 120 || telefone.length < 8 || telefone.length > 15) return NextResponse.json({ error: 'Preencha nome e telefone validos.' }, { status: 400 })
-    if (dataNascimento && !/^\d{4}-\d{2}-\d{2}$/.test(dataNascimento)) {
+    if (dataNascimento && !isRealDate(dataNascimento)) {
       return NextResponse.json({ error: 'Data de nascimento invalida.' }, { status: 400 })
     }
     if (servicoPreferidoId && !uuidPattern.test(servicoPreferidoId)) return NextResponse.json({ error: 'Servico invalido.' }, { status: 400 })
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } })
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: 'Cadastro publico nao configurado.' }, { status: 503 })
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
     if (servicoPreferidoId) {
       const { data: service, error: serviceError } = await supabase.from('servicos').select('id').eq('id', servicoPreferidoId).eq('user_id', barbeariaId).eq('ativo', true).maybeSingle()
       if (serviceError || !service) return NextResponse.json({ error: 'Servico invalido.' }, { status: 400 })

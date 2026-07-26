@@ -14,8 +14,8 @@ const emptyService: ServiceForm = { nome: '', preco: '', duracao: '30' }
 
 
 export default function ConfiguracoesPage() {
-  const [nomeBarbearia, setNomeBarbearia] = useState('Barbearia Jacobina')
-  const [whatsapp, setWhatsapp] = useState('(74) 98888-7777')
+  const [nomeBarbearia, setNomeBarbearia] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [cadeirasSimultaneas, setCadeirasSimultaneas] = useState('1')
   const [diasInativo, setDiasInativo] = useState('30')
   const [mensagemPadrao, setMensagemPadrao] = useState('Fala, {nome}! Tudo bem? Notamos que ja vai fazer um tempinho desde seu ultimo corte aqui na {barbearia}. Que tal dar aquela moral no visual essa semana? Clica aqui para agendar!')
@@ -26,20 +26,36 @@ export default function ConfiguracoesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [savingService, setSavingService] = useState(false)
   const [status, setStatus] = useState('')
+  const [loadingProfile, setLoadingProfile] = useState(true)
   const [activeTab, setActiveTab] = useState<'geral' | 'horarios' | 'marketing' | 'servicos'>('geral')
   const [schedule, setSchedule] = useState<Schedule[]>(defaultSchedule)
 
-  useEffect(() => { void loadServices(); void loadSchedule(); void loadCapacity() }, [])
+  useEffect(() => { void loadServices(); void loadSchedule(); void loadProfile() }, [])
 
-  async function loadCapacity() {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data, error } = await supabase.from('perfis_barbearia').select('cadeiras_simultaneas').eq('id', user.id).maybeSingle()
-    if (error) { setStatus('Erro ao carregar capacidade: ' + error.message); return }
-    if (data?.cadeiras_simultaneas) setCadeirasSimultaneas(String(data.cadeiras_simultaneas))
+  async function loadProfile() {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
+      const { data, error } = await supabase.from('perfis_barbearia')
+        .select('nome_estabelecimento,telefone_whatsapp,dias_para_alerta,mensagem_template,cadeiras_simultaneas,notificacoes_painel,envio_assistido')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (error) { setStatus('Erro ao carregar configuracoes: ' + error.message); return }
+      if (!data) return
+      if (data.nome_estabelecimento) setNomeBarbearia(data.nome_estabelecimento)
+      if (data.telefone_whatsapp) setWhatsapp(data.telefone_whatsapp)
+      if (data.dias_para_alerta !== null) setDiasInativo(String(data.dias_para_alerta))
+      if (data.mensagem_template) setMensagemPadrao(data.mensagem_template)
+      if (data.cadeiras_simultaneas) setCadeirasSimultaneas(String(data.cadeiras_simultaneas))
+      setNotifPainel(data.notificacoes_painel !== false)
+      setEnvioAutomatico(data.envio_assistido === true)
+    } catch (error) {
+      setStatus('Erro ao carregar configuracoes: ' + (error instanceof Error ? error.message : 'falha inesperada'))
+    } finally {
+      setLoadingProfile(false)
+    }
   }
-
   async function loadSchedule() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -63,6 +79,8 @@ export default function ConfiguracoesPage() {
   }
 
   async function handleSave() {
+    if (loadingProfile) return
+    if (!nomeBarbearia.trim() || whatsapp.replace(/\D/g, '').length < 8) { setStatus('Informe o nome da barbearia e um WhatsApp valido.'); return }
     const capacity = Number(cadeirasSimultaneas)
     const alertDays = Number(diasInativo)
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 50) { setStatus('Informe uma capacidade entre 1 e 50 cadeiras.'); return }
@@ -80,6 +98,8 @@ export default function ConfiguracoesPage() {
         dias_para_alerta: alertDays,
         mensagem_template: mensagemPadrao,
         cadeiras_simultaneas: capacity,
+        notificacoes_painel: notifPainel,
+        envio_assistido: envioAutomatico,
       }),
       supabase.from('expedientes').upsert(schedule.map((item) => ({ ...item, user_id: user.id })), { onConflict: 'user_id,dia_semana' }),
     ])
@@ -118,7 +138,7 @@ export default function ConfiguracoesPage() {
 
   return <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
     <div className="mb-8"><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Settings className="h-8 w-8 text-emerald-400" /> Configuracoes do Sistema</h1><p className="mt-1 text-sm text-slate-400">Organize dados, agendamentos, marketing e servicos em um so lugar.</p></div>
-    {status && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status}</p>}
+    {status && <p className={'mb-6 rounded-xl border px-4 py-3 text-sm ' + (status.startsWith('Erro') || status.startsWith('Sua sessao') || status.startsWith('Informe') ? 'border-rose-500/20 bg-rose-500/10 text-rose-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300')}>{status}</p>}
     <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-2" aria-label="Abas de configuracoes">
       {(['geral', 'horarios', 'marketing', 'servicos'] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={'whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition ' + (activeTab === tab ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/10' : 'text-slate-400 hover:bg-slate-800 hover:text-white')}>{tab === 'geral' ? 'Geral' : tab === 'horarios' ? 'Horarios' : tab === 'marketing' ? 'Marketing' : 'Servicos'}</button>)}
     </nav>
@@ -147,7 +167,7 @@ export default function ConfiguracoesPage() {
       <div className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800">{services.length ? services.map((service) => <div key={service.id} className="flex flex-col gap-3 bg-slate-950 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-white">{service.nome}</p><p className="mt-1 text-xs text-slate-500">R$ {service.preco.toFixed(2).replace('.', ',')} - {service.duracao_minutos} minutos</p></div><div className="flex gap-2"><button type="button" onClick={() => editService(service)} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"><Pencil className="h-3.5 w-3.5" /> Editar servico</button><button type="button" onClick={() => void deleteService(service)} className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/10"><Trash2 className="h-3.5 w-3.5" /> Apagar</button></div></div>) : <p className="p-5 text-sm text-slate-500">Nenhum servico cadastrado.</p>}</div>
     </section>
 
-    <div className="flex justify-end py-8"><button type="button" onClick={() => void handleSave()} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-8 py-4 font-bold text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400"><Save className="h-4 w-4" /> Salvar Todas as Configuracoes</button></div>
+    <div className="flex justify-end py-8"><button type="button" disabled={loadingProfile} onClick={() => void handleSave()} className="flex items-center disabled:cursor-not-allowed disabled:opacity-50 gap-2 rounded-xl bg-emerald-500 px-8 py-4 font-bold text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400"><Save className="h-4 w-4" /> {loadingProfile ? 'Carregando configuracoes...' : 'Salvar Todas as Configuracoes'}</button></div>
   </div>
 }
 

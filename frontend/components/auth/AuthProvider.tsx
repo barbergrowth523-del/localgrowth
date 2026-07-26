@@ -50,19 +50,24 @@ export function AuthProvider({ children, initialUser, initialPlan, initialSubscr
   const refreshPlan = useCallback(async () => {
     if (!userId) return
     setIsRefreshing(true)
-    const supabase = createClient()
-    const primary = await supabase.from('perfis_barbearia').select('plano').eq('id', userId).maybeSingle()
-    let profile = primary.data as ProfilePlan | null
+    try {
+      const supabase = createClient()
+      const primary = await supabase.from('perfis_barbearia').select('plano').eq('id', userId).maybeSingle()
+      let profile = primary.data as ProfilePlan | null
 
-    if (primary.error) {
-      const fallback = await supabase.from('perfis_barbearia').select('plan').eq('id', userId).maybeSingle()
-      profile = fallback.data as ProfilePlan | null
+      if (primary.error) {
+        const fallback = await supabase.from('perfis_barbearia').select('plan').eq('id', userId).maybeSingle()
+        profile = fallback.data as ProfilePlan | null
+      }
+
+      const nextPlan = normalizePlan(profile?.plano ?? profile?.plan ?? 'starter')
+      setPlan(nextPlan)
+      setSubscriptionActive(nextPlan !== 'free' && nextPlan !== 'gratuito')
+    } catch (error) {
+      console.error('[auth-context] plan refresh failed', error instanceof Error ? error.message : 'unknown error')
+    } finally {
+      setIsRefreshing(false)
     }
-
-    const nextPlan = normalizePlan(profile?.plano ?? profile?.plan ?? 'starter')
-    setPlan(nextPlan)
-    setSubscriptionActive(nextPlan !== 'free' && nextPlan !== 'gratuito')
-    setIsRefreshing(false)
   }, [userId])
 
   useEffect(() => {

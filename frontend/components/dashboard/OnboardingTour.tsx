@@ -29,7 +29,7 @@ export function OnboardingTour() {
 
   const updatePosition = useCallback(() => {
     const element = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
-    if (!element) return
+    if (!element) { setPosition(null); return }
     const rect = element.getBoundingClientRect()
     const outsideViewport = rect.top < 72 || rect.bottom > window.innerHeight - 32
     if (outsideViewport && scrollRequested.current !== current.key) { scrollRequested.current = current.key; element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); window.setTimeout(() => { scrollRequested.current = null; window.dispatchEvent(new Event('resize')) }, 450); return }
@@ -50,17 +50,27 @@ export function OnboardingTour() {
       if (!isTestAccount && window.localStorage.getItem(localKey) === 'done') return
       const savedStepValue = window.localStorage.getItem(localKey + '-step')
       const savedStep = Number(savedStepValue)
+      const queryStep = Number(new URLSearchParams(window.location.search).get('tourStep'))
       const hasSavedStep = Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length
-      if (isTestAccount && !hasSavedStep && pathname !== '/dashboard') return
-      const initialStep = hasSavedStep ? savedStep : 0
+      const hasQueryStep = tourNavigation && Number.isInteger(queryStep) && queryStep >= 0 && queryStep < steps.length
+      if (isTestAccount && !hasSavedStep && !hasQueryStep && pathname !== '/dashboard') return
+      const initialStep = hasQueryStep ? queryStep : hasSavedStep ? savedStep : 0
       setStep(initialStep)
-      if (steps[initialStep].route !== pathname) router.push(steps[initialStep].route)
-      if (hasSavedStep) setStep(savedStep)
-      const { data } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
+      window.localStorage.setItem(localKey + '-step', String(initialStep))
+      if (steps[initialStep].route !== pathname) {
+        router.replace(`${steps[initialStep].route}?tour=1&tourStep=${initialStep}`)
+        return
+      }
+      const { data, error } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
+      if (error) console.error('[onboarding] state lookup failed', error.code)
       if (isTestAccount || (!data?.completed_at && !data?.skipped_at)) setVisible(true)
     })()
   }, [pathname, router])
 
+  useEffect(() => {
+    setPosition(null)
+    scrollRequested.current = null
+  }, [pathname, current.key])
   useEffect(() => {
     if (!visible) return
     const target = document.querySelector<HTMLElement>(`[data-tour="${current.key}"]`)
@@ -95,7 +105,7 @@ export function OnboardingTour() {
     window.localStorage.removeItem(`prontusfy-onboarding-${userId ?? 'unknown'}-step`)
     const url = new URL(window.location.href)
     url.searchParams.delete('tour')
-    window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+    router.replace(url.pathname + url.search + url.hash)
     window.dispatchEvent(new Event('prontusfy-tour-ended'))
   }
 
@@ -123,8 +133,7 @@ export function OnboardingTour() {
 
     const nextStep = current.next
     if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(nextStep))
-    if (nextStep === 5) router.push('/dashboard?tour=1&tourStep=5')
-    else if (steps[nextStep].route !== current.route) router.push(steps[nextStep].route + '?tour=1&tourStep=' + nextStep)
+    router.push(steps[nextStep].route + '?tour=1&tourStep=' + nextStep)
     setStep(nextStep)
   }
 
@@ -132,7 +141,7 @@ export function OnboardingTour() {
     if (step === 0) return
     const previousStep = step - 1
     if (userId) window.localStorage.setItem(`prontusfy-onboarding-${userId}-step`, String(previousStep))
-    if (steps[previousStep].route !== current.route) router.push(steps[previousStep].route + '?tour=1&tourStep=' + previousStep)
+    router.push(steps[previousStep].route + '?tour=1&tourStep=' + previousStep)
     setStep(previousStep)
   }
 

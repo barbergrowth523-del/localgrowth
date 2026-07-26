@@ -1,16 +1,11 @@
-﻿import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { checkPublicRateLimit } from '@/lib/security/rate-limit'
+import { resolvePublicBarbershop } from '@/lib/public-barbershop'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 const timePattern = /^\d{2}:\d{2}$/
-const permanentBarbearias: Record<string, string | undefined> = { jacobina: process.env.BARBEARIA_JACOBINA_ID || 'a2ce084d-84bd-426e-9ec4-cc0f961df556' }
-
-function resolveBarbeariaId(value: string) {
-  return permanentBarbearias[value.trim().toLowerCase()]
-}
-
 function isRealDate(value: string) {
   if (!datePattern.test(value)) return false
   const date = new Date(value + 'T12:00:00')
@@ -36,8 +31,9 @@ export async function GET(request: Request) {
   }
   const ownerValue = params.get('barbearia')?.trim() ?? ''
   const date = params.get('date')?.trim() ?? ''
-  const barbeariaId = resolveBarbeariaId(ownerValue)
-  if (!barbeariaId || !uuidPattern.test(barbeariaId)) return NextResponse.json({ error: 'Link de agendamento invalido.' }, { status: 400 })
+  const shop = await resolvePublicBarbershop(ownerValue)
+  const barbeariaId = shop?.id
+  if (!barbeariaId) return NextResponse.json({ error: 'Link de agendamento invalido.' }, { status: 400 })
   if (!isRealDate(date)) return NextResponse.json({ error: 'Data invalida.', field: 'date' }, { status: 400 })
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ capacity: 1, booked: {} })
 
@@ -95,7 +91,8 @@ export async function POST(request: Request) {
   }
 
   const requestedOwner = body.barbearia || ''
-  const barbeariaId = resolveBarbeariaId(requestedOwner)
+  const shop = await resolvePublicBarbershop(requestedOwner)
+  const barbeariaId = shop?.id
   const nome = (body.nome || body.name || '').trim()
   const telefone = (body.telefone || body.phone || '').replace(/\D/g, '')
   const servicoId = (body.servicoId || body.servico_id || '').trim()
@@ -104,7 +101,7 @@ export async function POST(request: Request) {
   const time = (body.time || body.hora || body.hora_agendamento || '').trim()
   const requestedBarberId = (body.equipeId || body.equipe_id || body.barbeiroId || body.barbeiro_id || '').trim()
 
-  if (!barbeariaId || !uuidPattern.test(barbeariaId)) return errorResponse('Link de agendamento invalido.', 'barbearia')
+  if (!barbeariaId) return errorResponse('Link de agendamento invalido.', 'barbearia')
   if (nome.length < 2 || nome.length > 120) return errorResponse('Informe um nome valido.', 'nome')
   if (telefone.length < 8 || telefone.length > 15) return errorResponse('Informe um telefone valido.', 'telefone')
   if (!uuidPattern.test(servicoId) && !servicoNome) return errorResponse('Selecione um servico valido.', 'servicoId')

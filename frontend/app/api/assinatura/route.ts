@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { hasValidSameOrigin, readJsonBody } from '@/lib/security/request'
 
 type Row = Record<string, unknown>
 type Source = { table: 'perfis_barbearia'; key: 'id'; id: string; row: Row }
@@ -48,11 +49,15 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  if (!hasValidSameOrigin(request)) {
+    return NextResponse.json({ error: 'Origem invalida.' }, { status: 403 })
+  }
   const result = await getAccount()
   if (!result.user) return NextResponse.json({ error: 'Usuario nao autenticado.' }, { status: 401 })
   if (!result.source) return NextResponse.json({ error: 'Assinatura nao encontrada.' }, { status: 404 })
 
-  const body = await request.json() as { autoRenewal?: boolean }
+  const body = await readJsonBody<{ autoRenewal?: boolean }>(request)
+  if (!body) return NextResponse.json({ error: 'Dados invalidos.' }, { status: 400 })
   if (typeof body.autoRenewal !== 'boolean') return NextResponse.json({ error: 'Status de renovacao invalido.' }, { status: 400 })
 
   const sourceRow = result.source.row

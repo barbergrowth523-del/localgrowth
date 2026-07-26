@@ -4,6 +4,7 @@ import { BarChart3, Scissors, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ScalePaywall } from '@/components/ScalePaywall'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 type Barber = { id: string; nome: string; comissao_percentual: number }
 type Appointment = { equipe_id: string | null; servico_id: string | null; status: string; nota_avaliacao: number | null }
@@ -16,8 +17,10 @@ export default function RelatoriosPage() {
   const [selectedBarber, setSelectedBarber] = useState('all')
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const { permissions } = useAuth()
 
   useEffect(() => {
+    if (!permissions.canViewReports) { setLoading(false); return }
     async function loadReports() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -35,7 +38,7 @@ export default function RelatoriosPage() {
       setLoading(false)
     }
     void loadReports()
-  }, [])
+  }, [permissions.canViewReports])
 
   const prices = useMemo(() => new Map(services.map((service) => [service.id, Number(service.preco)])), [services])
   const filtered = useMemo(() => appointments.filter((item) => selectedBarber === 'all' || item.equipe_id === selectedBarber), [appointments, selectedBarber])

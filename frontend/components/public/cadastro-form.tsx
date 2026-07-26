@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 
 type PublicService = { id: string; nome: string; preco: number; duracao_minutos: number }
 
@@ -13,13 +13,17 @@ export default function CadastroForm({ barbearia }: { barbearia: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const nomeBarbearia = useMemo(() => {
-    if (!barbearia || isUuid(barbearia)) return 'Barbearia Jacobina'
-    return 'Barbearia ' + barbearia.replace(/[-_]+/g, ' ')
-  }, [barbearia])
+  const [nomeBarbearia, setNomeBarbearia] = useState('Barbearia')
+
 
   useEffect(() => {
-    fetch('/api/servicos?barbearia=' + encodeURIComponent(barbearia)).then((response) => response.ok ? response.json() : { services: [] }).then((data: { services?: PublicService[] }) => setServices(data.services ?? [])).catch(() => setServices([]))
+    fetch('/api/servicos?barbearia=' + encodeURIComponent(barbearia))
+      .then((response) => response.ok ? response.json() : { services: [] })
+      .then((data: { services?: PublicService[]; barbershop?: { name?: string } }) => {
+        setServices(data.services ?? [])
+        if (data.barbershop?.name) setNomeBarbearia(data.barbershop.name)
+      })
+      .catch(() => setServices([]))
   }, [barbearia])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

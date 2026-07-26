@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, MessageCircle, Plus, UserRound, X, XCircle } from 'lucide-react'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
@@ -96,7 +96,7 @@ export default function AgendaPage() {
 
       const [clientsResult, appointmentsResult, servicesResult, barbersResult] = await Promise.all([
         supabase.from('clientes').select('id,nome,telefone').eq('user_id', user.id).order('nome'),
-        supabase.from('agendamentos').select('id,avaliacao_token,cliente_id,servico_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
+        supabase.from('agendamentos').select('id,avaliacao_token,cliente_id,servico_id,equipe_id,data_agendamento,hora_agendamento,servico,status').eq('user_id', user.id).order('data_agendamento').order('hora_agendamento'),
         supabase.from('servicos').select('id,nome,preco,duracao_minutos').eq('user_id', user.id).eq('ativo', true).order('nome'),
         supabase.from('equipe').select('id,nome').eq('user_id', user.id).eq('ativo', true).order('nome'),
       ])

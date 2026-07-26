@@ -2,6 +2,7 @@ import { generateText } from 'ai'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkPublicRateLimit } from '@/lib/security/rate-limit'
+import { hasValidSameOrigin, readJsonBody } from '@/lib/security/request'
 
 type Tone = 'amigavel' | 'oferta' | 'direto'
 
@@ -12,6 +13,7 @@ const fallbackMessages: Record<Tone, (name: string, bookingUrl: string) => strin
 }
 
 export async function POST(request: Request) {
+  if (!hasValidSameOrigin(request)) return NextResponse.json({ error: 'Origem invalida.' }, { status: 403 })
   const sessionClient = await createClient()
   const { data: { user } } = await sessionClient.auth.getUser()
   if (!user) {
@@ -23,7 +25,8 @@ export async function POST(request: Request) {
   if (!allowed) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente mais tarde.' }, { status: 429 })
   }
-  const body = await request.json() as { name?: string; tone?: Tone; bookingUrl?: string }
+  const body = await readJsonBody<{ name?: string; tone?: Tone; bookingUrl?: string }>(request)
+  if (!body) return NextResponse.json({ error: 'Dados invalidos.' }, { status: 400 })
   const name = body.name?.trim().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 80) || 'cliente'
   const tone = body.tone && fallbackMessages[body.tone] ? body.tone : 'amigavel'
   const requestedBookingUrl = body.bookingUrl?.trim().slice(0, 500) || ''
