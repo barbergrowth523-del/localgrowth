@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { BarChart3, CalendarDays, CheckCircle2, LogOut, MessageCircle, Star } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import BrandLogo from '@/components/BrandLogo'
 
 type Appointment = { id: string; cliente_id: string; data_agendamento: string; hora_agendamento: string; servico: string; servico_id: string | null; status: string; nota_avaliacao: number | null }
 type Client = { id: string; nome: string; telefone: string }
@@ -56,6 +58,8 @@ export default function ProfessionalPanelPage() {
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-10">
       <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-5"><BrandLogo markClassName="h-16 w-auto max-w-[220px]" /><Link href="/login-profissional" className="text-sm font-semibold text-emerald-400 transition hover:text-emerald-300">Voltar para o login</Link></div>
+
         <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-emerald-400">Painel do profissional</p>

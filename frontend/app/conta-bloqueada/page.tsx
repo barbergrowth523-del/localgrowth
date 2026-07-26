@@ -17,7 +17,7 @@ export default function ContaBloqueadaPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 px-5 text-white">
       <section className="w-full max-w-md rounded-3xl border border-rose-500/20 bg-slate-900 p-7 text-center shadow-2xl">
-        <BrandLogo className="mb-8" markClassName="h-12 w-auto max-w-[180px]" />
+        <BrandLogo className="mb-8" markClassName="h-16 w-auto max-w-[220px]" />
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-rose-500/25 bg-rose-500/10 text-rose-300">
           <LockKeyhole className="h-6 w-6" />
         </div>

@@ -16,10 +16,10 @@ export function AuthLayout({ children, aside }: AuthLayoutProps) {
           {aside}
         </div>
       </aside>
-      <section className="flex w-full flex-col items-center justify-center bg-slate-950 px-6 py-10 sm:px-8 lg:w-1/2 lg:px-12">
+      <section className="flex min-w-0 w-full flex-col items-center justify-center bg-slate-950 px-4 py-10 sm:px-8 lg:w-1/2 lg:px-12">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 flex justify-center lg:hidden">
-            <BrandLogo markClassName="h-12 w-auto max-w-[180px]" />
+            <BrandLogo markClassName="h-16 w-auto max-w-[220px]" />
           </div>
           {children}
         </div>
