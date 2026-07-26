@@ -91,8 +91,7 @@ export default function ConfiguracoesPage() {
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
 
     const [profileResult, scheduleResult] = await Promise.all([
-      supabase.from('perfis_barbearia').upsert({
-        id: user.id,
+      supabase.from('perfis_barbearia').update({
         nome_estabelecimento: nomeBarbearia.trim(),
         telefone_whatsapp: whatsapp.trim(),
         dias_para_alerta: alertDays,
@@ -100,7 +99,7 @@ export default function ConfiguracoesPage() {
         cadeiras_simultaneas: capacity,
         notificacoes_painel: notifPainel,
         envio_assistido: envioAutomatico,
-      }),
+      }).eq('id', user.id),
       supabase.from('expedientes').upsert(schedule.map((item) => ({ ...item, user_id: user.id })), { onConflict: 'user_id,dia_semana' }),
     ])
 
