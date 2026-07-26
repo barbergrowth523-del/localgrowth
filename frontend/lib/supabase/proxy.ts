@@ -39,7 +39,7 @@ export async function updateSession(request: NextRequest) {
   if (!claims && requiresOwnerSession) return NextResponse.redirect(new URL('/login', request.url))
   // The admin account can inspect owner routes for QA.
   if (claims && requiresOwnerSession && isAdminIdentity && path === '/dashboard') return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-  if (claims && (path === '/' || path === '/login' || path === '/cadastro')) {
+  if (claims && (path === '/' || path === '/login' || path === '/cadastro' || path === '/verificar-email')) {
     return NextResponse.redirect(new URL(isAdminIdentity ? '/admin/dashboard' : '/dashboard', request.url))
   }
   return response
