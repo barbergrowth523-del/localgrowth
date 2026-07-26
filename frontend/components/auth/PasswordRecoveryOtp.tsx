@@ -5,7 +5,7 @@ import { ArrowRight, Eye, EyeOff, KeyRound, RefreshCw, ShieldCheck } from 'lucid
 import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-const OTP_LENGTH = 6
+const OTP_LENGTH = 8
 const RESEND_COOLDOWN_SECONDS = 60
 
 export function PasswordRecoveryOtp() {
@@ -65,7 +65,7 @@ export function PasswordRecoveryOtp() {
       return
     }
     if (token.length !== OTP_LENGTH) {
-      setError('Digite os 6 numeros recebidos por e-mail.')
+      setError('Digite os 8 numeros recebidos por e-mail.')
       setLoading(false)
       return
     }
@@ -132,12 +132,12 @@ export function PasswordRecoveryOtp() {
         <div className="mb-6 inline-flex rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400"><KeyRound className="h-6 w-6" /></div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-400">Prontusfy</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">Digite o codigo de recuperacao</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-400">Enviamos um codigo de recuperacao para seu e-mail. Digite os 6 numeros e defina sua nova senha.</p>
+        <p className="mt-3 text-sm leading-6 text-slate-400">Enviamos um codigo de recuperacao para seu e-mail. Digite os 8 numeros e defina sua nova senha.</p>
         <p className="mt-2 truncate text-sm text-slate-300">{email || 'Nenhum e-mail informado'}</p>
 
         <form onSubmit={submit} className="mt-8 space-y-6">
-          <div onPaste={handlePaste} className="flex justify-between gap-2">
-            {digits.map((digit, index) => <input key={index} ref={(element) => { inputs.current[index] = element }} value={digit} onChange={(event) => updateDigit(index, event.target.value)} onKeyDown={(event) => handleKeyDown(index, event)} inputMode="numeric" autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength={1} aria-label={`Digito ${index + 1}`} className="h-14 w-12 rounded-xl border border-slate-800 bg-slate-950 text-center text-2xl font-bold text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 sm:h-16 sm:w-14" />)}
+          <div onPaste={handlePaste} className="grid grid-cols-4 gap-2 sm:grid-cols-8 sm:gap-3">
+            {digits.map((digit, index) => <input key={index} ref={(element) => { inputs.current[index] = element }} value={digit} onChange={(event) => updateDigit(index, event.target.value)} onKeyDown={(event) => handleKeyDown(index, event)} inputMode="numeric" autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength={1} aria-label={`Digito ${index + 1}`} className="h-12 w-full rounded-xl border border-slate-800 bg-slate-950 text-center text-2xl font-bold text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 sm:h-14" />)}
           </div>
 
           <label className="block text-sm font-medium text-slate-200">Nova senha<div className="relative mt-2"><input required minLength={8} type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3.5 pr-12 text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20" placeholder="Minimo de 8 caracteres" /><button type="button" onClick={() => setShowNewPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:bg-slate-800 hover:text-emerald-300" aria-label={showNewPassword ? 'Esconder senha' : 'Mostrar senha'}>{showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button></div><span className={`mt-2 block text-xs ${newPassword.length >= 8 ? 'text-emerald-300' : 'text-slate-500'}`}>{strength}</span></label>

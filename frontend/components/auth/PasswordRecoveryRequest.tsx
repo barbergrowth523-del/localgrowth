@@ -46,7 +46,7 @@ export function PasswordRecoveryRequest() {
         </div>
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-400">Prontusfy</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">Recuperar senha</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-400">Informe seu e-mail. Enviaremos um codigo de 6 digitos para confirmar sua identidade.</p>
+        <p className="mt-3 text-sm leading-6 text-slate-400">Informe seu e-mail. Enviaremos um codigo de 8 digitos para confirmar sua identidade.</p>
 
         <form onSubmit={submit} className="mt-8 space-y-4">
           <label className="block text-sm font-medium text-slate-200">
