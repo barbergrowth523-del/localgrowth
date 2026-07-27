@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, Bot, Check, MessageCircle, Sparkles, TrendingUp } from 'lucide-react'
 import BrandLogo from '@/components/BrandLogo'
 import { BRAND_NAME } from '@/lib/brand'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 
 const steps = [
   { icon: Bot, title: 'A IA trabalha por você', text: 'Você sobe a sua lista. O sistema analisa as datas e te avisa exatamente quem quebrou a rotina e sumiu.' },
@@ -21,6 +22,6 @@ export default function Home() {
 
     <section className="relative mx-auto max-w-5xl px-6 py-16 text-center lg:py-20"><div className="absolute inset-x-1/4 top-8 -z-0 h-64 rounded-full bg-emerald-500/10 blur-[100px]" /><div className="relative rounded-3xl border border-white/10 bg-white/[0.04] px-6 py-16 backdrop-blur-xl sm:px-12"><p className="text-sm font-semibold uppercase tracking-[.18em] text-emerald-400">Recupere o controle</p><h2 className="mx-auto mt-4 max-w-2xl text-4xl font-semibold tracking-[-.05em] sm:text-5xl">O seu caixa não pode esperar.</h2><p className="mx-auto mt-5 max-w-xl text-base leading-7 text-slate-400">Transforme sua lista de contatos morta em agendamentos hoje mesmo.</p><Link href="/cadastro" className="mt-8 inline-flex items-center gap-3 rounded-xl bg-emerald-400 px-7 py-4 text-sm font-bold text-slate-950 shadow-xl shadow-emerald-500/20 transition hover:bg-emerald-300">Criar Minha Conta <ArrowRight size={18} /></Link></div></section>
 
-    <footer className="border-t border-white/10 px-6 py-8 lg:px-10"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-slate-500 sm:flex-row"><div className="flex items-center gap-2 font-semibold text-slate-300"><BrandLogo markClassName="h-7 w-7" nameClassName="text-sm" /></div><div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Feito para quem leva a cadeira a sério.</div></div></footer>
+    <footer className="border-t border-white/10 px-6 py-8 lg:px-10"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-slate-500"><div className="flex w-full flex-col items-center justify-between gap-4 sm:flex-row"><div className="flex items-center gap-2 font-semibold text-slate-300"><BrandLogo markClassName="h-7 w-7" nameClassName="text-sm" /></div><div className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Feito para quem leva a cadeira a serio.</div></div><LegalLinks className="justify-center sm:justify-start" /></div></footer>
   </main>
 }

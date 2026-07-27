@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 import { CheckCircle2, Loader2, MailCheck, RefreshCw } from 'lucide-react'
 import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -161,6 +162,7 @@ export function EmailOtpVerification() {
         <p className="mt-6 text-center text-xs text-slate-500">
           E-mail incorreto? <Link href="/cadastro" className="font-semibold text-emerald-400 hover:text-emerald-300">Voltar ao cadastro</Link>
         </p>
+      <LegalLinks className="mt-6 justify-center" />
       </section>
     </main>
   )

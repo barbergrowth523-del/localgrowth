@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 import { ArrowRight, Eye, EyeOff, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react'
 import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -150,6 +151,7 @@ export function PasswordRecoveryOtp() {
         <button type="button" onClick={() => void resend()} disabled={!email || cooldown > 0 || resending} className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-semibold text-emerald-400 transition hover:text-emerald-300 disabled:cursor-not-allowed disabled:text-slate-600"><RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />{resending ? 'Reenviando...' : cooldown > 0 ? `Reenviar codigo em ${cooldown}s` : 'Reenviar codigo'}</button>
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-400" /> O codigo e de uso unico e expira por seguranca.</div>
         <Link href="/login" className="mt-6 block text-center text-sm font-semibold text-slate-400 hover:text-white">Voltar para o login</Link>
+      <LegalLinks className="mt-6 justify-center" />
       </section>
     </main>
   )

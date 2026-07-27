@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 import { ArrowRight, Mail, ShieldCheck } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -70,6 +71,7 @@ export function PasswordRecoveryRequest() {
 
         <div className="mt-6 flex items-center gap-2 text-xs text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-400" /> O acesso sera protegido por verificacao segura.</div>
         <Link href="/login" className="mt-6 block text-center text-sm font-semibold text-emerald-400 hover:text-emerald-300">Voltar para o login</Link>
+      <LegalLinks className="mt-6 justify-center" />
       </section>
     </main>
   )

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import BrandLogo from '@/components/BrandLogo'
+import { LegalLinks } from '@/components/legal/LegalLinks'
 
 type AuthLayoutProps = {
   children: ReactNode
@@ -22,6 +23,7 @@ export function AuthLayout({ children, aside }: AuthLayoutProps) {
             <BrandLogo markClassName="h-16 w-auto max-w-[220px]" />
           </div>
           {children}
+          <LegalLinks className="mt-8 justify-center lg:justify-start" />
         </div>
       </section>
     </main>
