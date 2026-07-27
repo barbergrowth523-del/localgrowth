@@ -73,6 +73,7 @@ export function EmailOtpVerification() {
       window.sessionStorage.removeItem('prontusfy-signup-otp-sent-at')
       window.localStorage.removeItem(`prontusfy-onboarding-${data.user.id}`)
       window.localStorage.removeItem(`prontusfy-onboarding-${data.user.id}-step`)
+      window.localStorage.setItem(`prontusfy-welcome-${data.user.id}`, 'pending')
       void supabase.from('account_activity_events').insert({ user_id: data.user.id, event_type: 'email_verified' })
       window.setTimeout(() => window.location.replace('/dashboard?tour=1&tourStep=0'), 700)
     } catch {

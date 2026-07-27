@@ -6,6 +6,7 @@ import { SupportChat } from '@/components/support/SupportChat'
 import { GlobalBroadcastBanner } from '@/components/dashboard/GlobalBroadcastBanner'
 import { NotificationCenter } from '@/components/dashboard/NotificationCenter'
 import { OnboardingTour } from '@/components/dashboard/OnboardingTour'
+import { WelcomeMessage } from '@/components/dashboard/WelcomeMessage'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionClient = await createClient()
@@ -41,6 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
       <NotificationCenter />
       <OnboardingTour />
+      <WelcomeMessage userId={user.id} barbershopName={profile.nome_estabelecimento} />
       <GlobalBroadcastBanner />
       <SupportChat barbershopName={profile.nome_estabelecimento} />
     </AuthProvider>

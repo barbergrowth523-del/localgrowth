@@ -68,6 +68,7 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
 
         if (data.session) {
           window.localStorage.removeItem(`prontusfy-onboarding-${data.user?.id ?? 'unknown'}`)
+          if (data.user?.id) window.localStorage.setItem(`prontusfy-welcome-${data.user.id}`, 'pending')
           window.location.replace('/dashboard?tour=1&tourStep=0')
           return
         }

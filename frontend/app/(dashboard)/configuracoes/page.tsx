@@ -3,6 +3,7 @@
 import { Bell, Clock, Clock3, MessageSquare, Pencil, Plus, Save, Settings, Store, Trash2, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard'
 
 
 type Service = { id: string; nome: string; preco: number; duracao_minutos: number }
@@ -145,6 +146,7 @@ export default function ConfiguracoesPage() {
     <section className={(activeTab === 'geral' ? '' : 'hidden ') + 'space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl lg:p-8'}>
       <Header icon={<Store className="h-5 w-5" />} title="Informacoes do estabelecimento" description="Dados usados no perfil e nas mensagens enviadas aos clientes." />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2"><Field label="Nome da Barbearia" value={nomeBarbearia} onChange={setNomeBarbearia} /><Field label="WhatsApp de Atendimento" value={whatsapp} onChange={setWhatsapp} type="tel" /><label className="block text-xs font-medium text-slate-400">Dias sem corte para alerta<select value={diasInativo} onChange={(event) => setDiasInativo(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-sm text-white outline-none transition focus:border-emerald-500"><option value="20">20 dias (Ritmo acelerado)</option><option value="30">30 dias (Recomendado)</option><option value="45">45 dias (Espacado)</option><option value="60">60 dias (Critico)</option></select></label></div>
+      <DeleteAccountCard />
     </section>
 
     <section className={(activeTab === 'horarios' ? '' : 'hidden ') + 'mt-6 space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl lg:p-8'}>
