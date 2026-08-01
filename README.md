@@ -17,3 +17,7 @@ O CSV esperado tem cabeçalho e três colunas, nesta ordem: `Nome,Telefone,Data 
 - `frontend/`: aplica??o Next.js, componentes, APIs e configura??es da Vercel.
 - `backend/supabase/`: migra??es e SQL do banco.
 - A Vercel deve usar `frontend` como Root Directory.
+
+## Social automation module
+
+Official Prontusfy-only social automation lives in `n8n/`. See `n8n/docs/social-media-setup.md` and `n8n/docs/social-media-test-plan.md` before importing or activating workflows. Tokens are stored only in Supabase and are never exposed to the frontend.
