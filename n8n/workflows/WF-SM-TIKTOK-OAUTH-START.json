@@ -1,0 +1,32 @@
+{
+  "name": "WF-SM-TIKTOK-OAUTH-START",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "GET", "path": "tiktok-oauth-start", "responseMode": "responseNode", "options": {} },
+      "id": "wf-sm-start-webhook", "name": "01 - Webhook TikTok OAuth Start", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [260, 300]
+    },
+    {
+      "parameters": { "jsCode": "const { randomBytes } = require('crypto');\nconst state = randomBytes(32).toString('base64url');\nreturn [{ json: { platform: 'tiktok', state, status: 'pending', expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() } }];" },
+      "id": "wf-sm-start-state", "name": "02 - Generate OAuth State", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [500, 300]
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $env.SUPABASE_URL + '/rest/v1/oauth_sessions' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" }, { "name": "Content-Type", "value": "application/json" }, { "name": "Prefer", "value": "return=representation" }] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={{ { platform: $json.platform, state: $json.state, status: $json.status, expires_at: $json.expires_at } }}", "options": {} },
+      "id": "wf-sm-start-save", "name": "03 - Save OAuth Session", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [740, 300]
+    },
+    {
+      "parameters": { "jsCode": "const session = $('02 - Generate OAuth State').first().json;\nconst base = $env.TIKTOK_AUTHORIZATION_URL;\nif (!base || base.includes('REPLACE')) throw new Error('TIKTOK_AUTHORIZATION_URL_NOT_CONFIGURED');\nif (!$env.TIKTOK_CLIENT_ID || !$env.TIKTOK_REDIRECT_URI) throw new Error('TIKTOK_OAUTH_ENV_NOT_CONFIGURED');\nconst authorizationUrl = new URL(base);\nauthorizationUrl.searchParams.set('client_id', $env.TIKTOK_CLIENT_ID);\nauthorizationUrl.searchParams.set('redirect_uri', $env.TIKTOK_REDIRECT_URI);\nauthorizationUrl.searchParams.set('state', session.state);\nreturn [{ json: { authorization_url: authorizationUrl.toString() } }];" },
+      "id": "wf-sm-start-url", "name": "04 - Build TikTok Authorization URL", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [980, 300]
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "={{ { authorization_url: $json.authorization_url } }}", "options": { "responseCode": 200 } },
+      "id": "wf-sm-start-respond", "name": "05 - Respond Redirect", "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.1, "position": [1220, 300]
+    }
+  ],
+  "connections": {
+    "01 - Webhook TikTok OAuth Start": { "main": [[{ "node": "02 - Generate OAuth State", "type": "main", "index": 0 }]] },
+    "02 - Generate OAuth State": { "main": [[{ "node": "03 - Save OAuth Session", "type": "main", "index": 0 }]] },
+    "03 - Save OAuth Session": { "main": [[{ "node": "04 - Build TikTok Authorization URL", "type": "main", "index": 0 }]] },
+    "04 - Build TikTok Authorization URL": { "main": [[{ "node": "05 - Respond Redirect", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {}, "settings": { "executionOrder": "v1" }, "active": false, "versionId": "", "meta": { "templateCredsSetupCompleted": true }, "tags": []
+}

@@ -1,0 +1,331 @@
+﻿{
+    "name":  "WF-SM-SCHEDULED-PUBLISHER",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "rule":  {
+                                                      "interval":  [
+                                                                       {
+                                                                           "field":  "minutes",
+                                                                           "minutesInterval":  1
+                                                                       }
+                                                                   ]
+                                                  }
+                                     },
+                      "id":  "publisher-schedule",
+                      "name":  "01 - Schedule Every Minute",
+                      "type":  "n8n-nodes-base.scheduleTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       220,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{ $env.SUPABASE_URL + \u0027/rest/v1/scheduled_posts?select=*\u0026status=eq.pending\u0026scheduled_for=lte.\u0027 + encodeURIComponent(new Date().toISOString()) + \u0027\u0026order=scheduled_for.asc\u0026limit=10\u0027 }}",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "apikey",
+                                                                                         "value":  "={{ $env.SUPABASE_SERVICE_KEY }}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "publisher-load",
+                      "name":  "02 - Load Due Scheduled Posts",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       450,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "batchSize":  1,
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "publisher-loop",
+                      "name":  "03 - Loop Posts",
+                      "type":  "n8n-nodes-base.splitInBatches",
+                      "typeVersion":  3,
+                      "position":  [
+                                       680,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "PATCH",
+                                         "url":  "={{ $env.SUPABASE_URL + \u0027/rest/v1/scheduled_posts?id=eq.\u0027 + $json.id + \u0027\u0026status=eq.pending\u0027 }}",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "apikey",
+                                                                                         "value":  "={{ $env.SUPABASE_SERVICE_KEY }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Prefer",
+                                                                                         "value":  "return=representation"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ { status: \u0027processing\u0027, processing_started_at: new Date().toISOString() } }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "publisher-claim",
+                      "name":  "04 - Claim Post",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       910,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const claimed = $json;\nif (Array.isArray(claimed) \u0026\u0026 claimed.length === 0) return [];\nconst post = Array.isArray(claimed) ? claimed[0] : claimed;\nreturn [{ json: { scheduled_post_id: post.id, title: post.title, caption: post.caption, media_type: post.media_type, media_url: post.media_url, platforms: post.platforms, attempt: Number(post.retry_count || 0) + 1 } }];"
+                                     },
+                      "id":  "publisher-build",
+                      "name":  "05 - Build WF-07 Input",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1140,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "workflowId":  {
+                                                            "__rl":  true,
+                                                            "value":  "REPLACE_WITH_WF_07_SOCIAL_PUBLISHER_MASTER_ID",
+                                                            "mode":  "list",
+                                                            "cachedResultName":  "WF-07 Social Publisher Master"
+                                                        },
+                                         "options":  {
+                                                         "waitForSubWorkflow":  true
+                                                     }
+                                     },
+                      "id":  "publisher-execute",
+                      "name":  "06 - Execute WF-07 Social Publisher Master",
+                      "type":  "n8n-nodes-base.executeWorkflow",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       1370,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "function sanitize(value) { const keys = [\u0027access_token\u0027,\u0027refresh_token\u0027,\u0027client_secret\u0027,\u0027authorization\u0027,\u0027apikey\u0027,\u0027api_key\u0027,\u0027secret\u0027,\u0027password\u0027]; if (Array.isArray(value)) return value.map(sanitize); if (value \u0026\u0026 typeof value === \u0027object\u0027) return Object.fromEntries(Object.entries(value).map(([k,v]) =\u003e [k, keys.includes(k.toLowerCase()) ? \u0027[REDACTED]\u0027 : sanitize(v)])); return value; }\nconst original = $(\u002705 - Build WF-07 Input\u0027).first().json;\nconst result = sanitize($json);\nconst records = Array.isArray(result.publication_records) ? result.publication_records : [];\nconst successes = records.filter((r) =\u003e r.success === true || r.status === \u0027published\u0027);\nconst finalStatus = successes.length === records.length \u0026\u0026 records.length \u003e 0 ? \u0027published\u0027 : successes.length \u003e 0 ? \u0027partially_published\u0027 : \u0027failed\u0027;\nreturn [{ json: { scheduled_post_id: original.scheduled_post_id, final_status: finalStatus, published_at: finalStatus === \u0027published\u0027 ? new Date().toISOString() : null, records, response_sanitized: result } }];"
+                                     },
+                      "id":  "publisher-normalize",
+                      "name":  "07 - Normalize Publication Result",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1600,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "PATCH",
+                                         "url":  "={{ $env.SUPABASE_URL + \u0027/rest/v1/scheduled_posts?id=eq.\u0027 + $json.scheduled_post_id }}",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "apikey",
+                                                                                         "value":  "={{ $env.SUPABASE_SERVICE_KEY }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ { status: $json.final_status, published_at: $json.published_at } }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "publisher-update",
+                      "name":  "08 - Update Scheduled Post",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1830,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "={{ $env.SUPABASE_URL + \u0027/rest/v1/publication_logs\u0027 }}",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "apikey",
+                                                                                         "value":  "={{ $env.SUPABASE_SERVICE_KEY }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Prefer",
+                                                                                         "value":  "return=representation"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ $(\u002707 - Normalize Publication Result\u0027).first().json.records.map((record) =\u003e ({ scheduled_post_id: $(\u002707 - Normalize Publication Result\u0027).first().json.scheduled_post_id, platform: record.platform, status: record.status || (record.success ? \u0027published\u0027 : \u0027failed\u0027), external_post_id: record.external_post_id || null, external_publish_id: record.external_publish_id || null, external_url: record.external_url || null, attempt: record.attempt || 1, error_code: record.error_code || null, error_message: record.error_message || null, response_sanitized: record })) }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "publisher-logs",
+                      "name":  "09 - Insert Publication Logs",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       2060,
+                                       300
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "01 - Schedule Every Minute":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  "02 - Load Due Scheduled Posts",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       },
+                        "02 - Load Due Scheduled Posts":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "03 - Loop Posts",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "03 - Loop Posts":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "04 - Claim Post",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "04 - Claim Post":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "05 - Build WF-07 Input",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "05 - Build WF-07 Input":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "06 - Execute WF-07 Social Publisher Master",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "06 - Execute WF-07 Social Publisher Master":  {
+                                                                           "main":  [
+                                                                                        [
+                                                                                            {
+                                                                                                "node":  "07 - Normalize Publication Result",
+                                                                                                "type":  "main",
+                                                                                                "index":  0
+                                                                                            }
+                                                                                        ]
+                                                                                    ]
+                                                                       },
+                        "07 - Normalize Publication Result":  {
+                                                                  "main":  [
+                                                                               [
+                                                                                   {
+                                                                                       "node":  "08 - Update Scheduled Post",
+                                                                                       "type":  "main",
+                                                                                       "index":  0
+                                                                                   }
+                                                                               ]
+                                                                           ]
+                                                              },
+                        "08 - Update Scheduled Post":  {
+                                                           "main":  [
+                                                                        {
+                                                                            "node":  "09 - Insert Publication Logs",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                       },
+                        "09 - Insert Publication Logs":  {
+                                                             "main":  [
+                                                                          {
+                                                                              "node":  "03 - Loop Posts",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                         }
+                    },
+    "pinData":  {
+
+                },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 },
+    "active":  false,
+    "versionId":  "",
+    "meta":  {
+                 "templateCredsSetupCompleted":  true
+             },
+    "tags":  [
+
+             ]
+}
