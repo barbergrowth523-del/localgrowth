@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto'
+﻿import { timingSafeEqual } from 'node:crypto'
 
 import { NextResponse } from 'next/server'
 
@@ -19,6 +19,7 @@ type AsaasWebhook = {
     confirmedDate?: string
     clientPaymentDate?: string
     paymentDate?: string
+    subscription?: string
   }
 }
 
@@ -35,13 +36,7 @@ function tokensMatch(received: string | null, expected: string) {
 
 function parseReference(value: string | undefined) {
   const [userId, plan, period, extra] = value?.split(':') ?? []
-  if (
-    extra ||
-    !uuidPattern.test(userId ?? '') ||
-    !['starter', 'pro', 'scale'].includes(plan ?? '') ||
-    !['monthly', 'annual'].includes(period ?? '')
-  ) return null
-
+  if (extra || !uuidPattern.test(userId ?? '') || !['starter', 'pro', 'scale'].includes(plan ?? '') || !['monthly', 'annual'].includes(period ?? '')) return null
   return { userId, plan: plan as PlanId, period: period as BillingPeriod }
 }
 
@@ -51,10 +46,7 @@ export async function POST(request: Request) {
     console.error('[webhooks/asaas] ASAAS_WEBHOOK_TOKEN is not configured')
     return NextResponse.json({ received: false }, { status: 503 })
   }
-
-  if (!tokensMatch(request.headers.get('asaas-access-token'), webhookToken)) {
-    return NextResponse.json({ received: false }, { status: 401 })
-  }
+  if (!tokensMatch(request.headers.get('asaas-access-token'), webhookToken)) return NextResponse.json({ received: false }, { status: 401 })
 
   let body: AsaasWebhook
   try {
@@ -62,20 +54,36 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ received: false }, { status: 400 })
   }
-
-  if (!body.event || !acceptedEvents.has(body.event)) {
-    return NextResponse.json({ received: true, ignored: true })
-  }
+  if (!body.event || !acceptedEvents.has(body.event)) return NextResponse.json({ received: true, ignored: true })
 
   const eventId = body.id?.trim()
   const paymentId = body.payment?.id?.trim()
-  const reference = parseReference(body.payment?.externalReference)
+  let reference = parseReference(body.payment?.externalReference)
+  const providerSubscriptionId = body.payment?.subscription?.trim()
+  const admin = createAdminClient()
+
+  if (providerSubscriptionId) {
+    const { data: mappedSubscription, error: mappingError } = await admin
+      .from('asaas_subscriptions')
+      .select('user_id,plan,billing_period')
+      .eq('provider_subscription_id', providerSubscriptionId)
+      .maybeSingle()
+    if (mappingError) {
+      console.error('[webhooks/asaas] subscription mapping lookup failed', { code: mappingError.code })
+      return NextResponse.json({ received: false }, { status: 500 })
+    }
+    if (mappedSubscription) {
+      const mappedReference = { userId: mappedSubscription.user_id, plan: mappedSubscription.plan as PlanId, period: mappedSubscription.billing_period as BillingPeriod }
+      if (reference && (reference.userId !== mappedReference.userId || reference.plan !== mappedReference.plan || reference.period !== mappedReference.period)) {
+        console.error('[webhooks/asaas] subscription mapping mismatch', { eventId, paymentId })
+        return NextResponse.json({ received: false }, { status: 400 })
+      }
+      reference = mappedReference
+    }
+  }
+
   if (!eventId || !paymentId || !reference) {
-    console.error('[webhooks/asaas] invalid event metadata', {
-      hasEventId: Boolean(eventId),
-      hasPaymentId: Boolean(paymentId),
-      hasReference: Boolean(reference),
-    })
+    console.error('[webhooks/asaas] invalid event metadata', { hasEventId: Boolean(eventId), hasPaymentId: Boolean(paymentId), hasReference: Boolean(reference) })
     return NextResponse.json({ received: false }, { status: 400 })
   }
 
@@ -88,11 +96,8 @@ export async function POST(request: Request) {
 
   const confirmedAtValue = body.payment?.confirmedDate ?? body.payment?.clientPaymentDate ?? body.payment?.paymentDate ?? new Date().toISOString()
   const confirmedAt = new Date(confirmedAtValue)
-  if (Number.isNaN(confirmedAt.getTime())) {
-    return NextResponse.json({ received: false }, { status: 400 })
-  }
+  if (Number.isNaN(confirmedAt.getTime())) return NextResponse.json({ received: false }, { status: 400 })
 
-  const admin = createAdminClient()
   const { data, error } = await admin.rpc('process_asaas_subscription_event', {
     p_event_id: eventId,
     p_payment_id: paymentId,
@@ -101,14 +106,22 @@ export async function POST(request: Request) {
     p_billing_period: reference.period,
     p_confirmed_at: confirmedAt.toISOString(),
   })
-
   if (error) {
     console.error('[webhooks/asaas] persistence failed', { eventId, code: error.code })
     return NextResponse.json({ received: false }, { status: 500 })
   }
 
-  return NextResponse.json(
-    { received: true, duplicate: data === false },
-    { headers: { 'Cache-Control': 'no-store' } },
-  )
+  if (providerSubscriptionId && data !== false) {
+    const { error: updateError } = await admin.from('asaas_subscriptions').update({
+      status: 'active',
+      last_payment_id: paymentId,
+      last_payment_confirmed_at: confirmedAt.toISOString(),
+    }).eq('provider_subscription_id', providerSubscriptionId)
+    if (updateError) {
+      console.error('[webhooks/asaas] subscription status update failed', { eventId, code: updateError.code })
+      return NextResponse.json({ received: false }, { status: 500 })
+    }
+  }
+
+  return NextResponse.json({ received: true, duplicate: data === false }, { headers: { 'Cache-Control': 'no-store' } })
 }

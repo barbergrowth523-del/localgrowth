@@ -42,6 +42,8 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
   const tourDemo = searchParams.get('tour') === '1' && searchParams.get('tourStep') === '5'
   const [planLabel, setPlanLabel] = useState('Plano Free')
   const [bookingLink, setBookingLink] = useState('')
+  const [alertDays, setAlertDays] = useState(25)
+  const [missingDays, setMissingDays] = useState(35)
   const displayName = profileName || fallbackName
   const firstName = displayName.split(' ')[0] || 'Usuario'
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
@@ -50,7 +52,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
     const [primaryProfile, result] = await Promise.all([
-      supabase.from('perfis_barbearia').select('nome_estabelecimento,plano,slug').eq('id', user.id).maybeSingle(),
+      supabase.from('perfis_barbearia').select('nome_estabelecimento,plano,slug,dias_para_alerta,dias_para_sumido').eq('id', user.id).maybeSingle(),
       supabase.from('clientes').select('id,nome,telefone,data_ultimo_corte,data_nascimento').eq('user_id', user.id).order('data_ultimo_corte', { ascending: true }),
     ])
     const profile = primaryProfile.data as Record<string, unknown> | null
@@ -60,6 +62,10 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     const savedSlug = profileValue(['slug'])
     if (savedName) setProfileName(savedName.trim())
     if (savedSlug) setBookingLink(window.location.origin + '/agendar?barbearia=' + encodeURIComponent(savedSlug))
+    const configuredAlertDays = Number(profile?.dias_para_alerta)
+    const configuredMissingDays = Number(profile?.dias_para_sumido)
+    if (Number.isFinite(configuredAlertDays) && configuredAlertDays >= 0) setAlertDays(configuredAlertDays)
+    if (Number.isFinite(configuredMissingDays) && configuredMissingDays > configuredAlertDays) setMissingDays(configuredMissingDays)
     if (savedPlan) {
       const cleanPlan = savedPlan.replace(/^plano\s+/i, '').trim()
       setPlanLabel('Plano ' + (cleanPlan ? cleanPlan.charAt(0).toUpperCase() + cleanPlan.slice(1).toLowerCase() : 'Free'))
@@ -113,7 +119,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     }
   }
     const dashboardClients = tourDemo ? [demoClient, ...clients] : clients
-  const sumidoCount = dashboardClients.filter(c => getRetentionStatus(c) === 'sumido').length
+  const sumidoCount = dashboardClients.filter(c => getRetentionStatus(c, alertDays, missingDays) === 'sumido').length
   const atRisk = sumidoCount * 60
   const estimatedRecoveries = Math.min(sumidoCount, 2)
   const roiMultiple = estimatedRecoveries === 0 ? 0 : estimatedRecoveries
@@ -122,8 +128,8 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
       {status && <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"><CheckCircle2 size={17} />{status}</div>}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"><MoneyOnTableCard value={atRisk} sumidoCount={sumidoCount} /><RoiBadge multiple={roiMultiple} recoveries={estimatedRecoveries} /><Stat icon={<Users size={18} />} label="Total de clientes" value={dashboardClients.length} /><Stat icon={<CalendarDays size={18} />} label="Cortes este mes" value={dashboardClients.filter(c => new Date(c.last_cut_at).getMonth() === new Date().getMonth()).length} /></div>
       <BirthdayPanel clients={dashboardClients} />
-      <HealthBaseChart clients={dashboardClients} />
-      <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-sm"><div className="flex flex-col justify-between gap-4 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center"><div><h2 className="font-semibold">Sua base de clientes</h2><p className="mt-1 text-sm text-slate-500">Clientes ha mais de 30 dias aparecem destacados.</p></div><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-500" /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente" className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 sm:w-56" /></div><select value={frequencyFilter} onChange={event => setFrequencyFilter(event.target.value)} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-300 outline-none focus:border-slate-900"><option value="todos">Todas as frequencias</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-950 text-xs font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-4 font-medium">Cliente</th><th className="px-5 py-4 font-medium">Telefone</th><th className="px-5 py-4 font-medium">Ultimo corte</th><th className="px-5 py-4 font-medium">Status</th><th className="px-5 py-4" /></tr></thead><tbody className="divide-y divide-slate-800">{filteredClientes.length ? filteredClientes.map(client => <ClientRow key={client.id} client={client} bookingUrl={bookingLink} onSelect={() => setSelectedClient(client)} />) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado com estes filtros.</td></tr>}</tbody></table></div>{!clients.length && !tourDemo && <p className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500">Sua base esta vazia. Importe sua planilha ou cadastre um cliente para comecar.</p>}</section>
+      <HealthBaseChart clients={dashboardClients} alertDays={alertDays} missingDays={missingDays} />
+      <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-sm"><div className="flex flex-col justify-between gap-4 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center"><div><h2 className="font-semibold">Sua base de clientes</h2><p className="mt-1 text-sm text-slate-500">Clientes ha mais de {missingDays} dias aparecem destacados.</p></div><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-500" /><input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente" className="w-full rounded-lg border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 sm:w-56" /></div><select value={frequencyFilter} onChange={event => setFrequencyFilter(event.target.value)} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-300 outline-none focus:border-slate-900"><option value="todos">Todas as frequencias</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-950 text-xs font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-4 font-medium">Cliente</th><th className="px-5 py-4 font-medium">Telefone</th><th className="px-5 py-4 font-medium">Ultimo corte</th><th className="px-5 py-4 font-medium">Status</th><th className="px-5 py-4" /></tr></thead><tbody className="divide-y divide-slate-800">{filteredClientes.length ? filteredClientes.map(client => <ClientRow key={client.id} client={client} bookingUrl={bookingLink} alertDays={alertDays} missingDays={missingDays} onSelect={() => setSelectedClient(client)} />) : <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">Nenhum cliente encontrado com estes filtros.</td></tr>}</tbody></table></div>{!clients.length && !tourDemo && <p className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500">Sua base esta vazia. Importe sua planilha ou cadastre um cliente para comecar.</p>}</section>
     </div><ClientDrawer client={selectedClient} bookingUrl={bookingLink} onClose={() => setSelectedClient(null)} /></main>
 }
 function MoneyOnTableCard({ value, sumidoCount }: { value: number; sumidoCount: number }) {
@@ -138,10 +144,10 @@ function RoiBadge({ multiple, recoveries }: { multiple: number; recoveries: numb
   const displayedMultiple = useCountUp(multiple)
   return <div className="h-full rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 shadow-sm"><p className="text-sm font-medium text-slate-500">Retorno do Sistema</p><p className="mt-2 text-2xl font-bold text-emerald-300">{multiple === 0 ? 'Pronto para o primeiro resgate!' : 'O sistema ja se pagou ' + displayedMultiple + ' vezes!'}</p><p className="mt-1 text-xs text-emerald-300/80">Estimativa com {countLabel(recoveries, 'resgate', 'resgates')} hipoteticos.</p></div>
 }
-function getRetentionStatus(client: Client): 'em_dia' | 'alerta' | 'sumido' {
+function getRetentionStatus(client: Client, alertDays = 25, missingDays = 35): 'em_dia' | 'alerta' | 'sumido' {
   if (client.status_calculado === 'sumido' || client.status_calculado === 'alerta' || client.status_calculado === 'em_dia') return client.status_calculado
   const days = (Date.now() - new Date(client.last_cut_at + 'T12:00:00').getTime()) / 86400000
-  return days >= 35 ? 'sumido' : days > 25 ? 'alerta' : 'em_dia'
+  return days >= missingDays ? 'sumido' : days > alertDays ? 'alerta' : 'em_dia'
 }
 
 function formatPhone(phone: string) {
@@ -171,13 +177,13 @@ function BirthdayPanel({ clients }: { clients: Client[] }) {
 
   return <section className="mb-6 rounded-xl border border-slate-800 bg-slate-900 p-5 shadow-sm"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><div className="rounded-lg bg-amber-500/10 p-2 text-amber-400"><Cake size={18} /></div><div><h2 className="font-semibold text-white">Aniversariantes do mes</h2><p className="mt-1 text-xs text-slate-500">Parabenize seus clientes e ofereca 15% de desconto no proximo corte.</p></div></div><span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300">{birthdayClients.length} neste mes</span></div>{birthdayClients.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{birthdayClients.map((client) => { const day = Number(client.birthday?.slice(-2)); const thisWeek = day >= currentDay && day <= currentDay + 7; return <div key={client.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{client.name}</p><p className="mt-1 text-xs text-slate-500">Dia {String(day).padStart(2, '0')} {thisWeek ? '- Nesta semana' : ''}</p></div><button type="button" onClick={() => openBirthdayWhatsApp(client)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"><MessageCircle size={14} /> WhatsApp</button></div> })}</div> : <div className="mt-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 text-center text-sm text-slate-500">Nenhum aniversariante cadastrado neste mes. Adicione datas no cadastro de clientes.</div>}</section>
 }
-function HealthBaseChart({ clients }: { clients: Client[] }) {
+function HealthBaseChart({ clients, alertDays, missingDays }: { clients: Client[]; alertDays: number; missingDays: number }) {
   if (!clients.length) {
     return <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow-sm"><h3 className="mb-2 text-sm font-semibold text-slate-500">Saude da Base de Clientes</h3><div className="h-3 w-full rounded-full bg-slate-800" /><p className="mt-2 text-xs text-slate-600">Adicione clientes para ativar esta visao.</p></div>
   }
 
   const totals = clients.reduce((summary, client) => {
-    summary[getRetentionStatus(client)] += 1
+    summary[getRetentionStatus(client, alertDays, missingDays)] += 1
     return summary
   }, { em_dia: 0, alerta: 0, sumido: 0 })
   const total = clients.length
@@ -216,14 +222,14 @@ function ClientDrawer({ client, bookingUrl, onClose }: { client: Client | null; 
   }
   return <div className="fixed inset-0 z-50 flex justify-end"><button aria-label="Fechar detalhes" onClick={onClose} className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm" /><aside className="relative h-full w-full max-w-md overflow-y-auto border-l border-slate-800 bg-slate-900 p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Detalhes do cliente</p><h2 className="mt-2 text-2xl font-semibold text-white">{client.name}</h2><p className="mt-1 text-sm text-slate-500">{formatPhone(client.phone)}</p></div><button onClick={onClose} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-950 hover:text-white"><X size={18} /></button></div><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-lg bg-slate-950 p-3"><p className="text-xs text-slate-500">Ultimo corte</p><p className="mt-1 text-sm font-semibold text-white">{formatDate(client.last_cut_at)}</p></div><div className="rounded-lg bg-slate-950 p-3"><p className="text-xs text-slate-500">Frequencia</p><p className="mt-1 text-sm font-semibold capitalize text-white">{client.frequency ?? 'Nao informada'}</p></div></div><div className="mt-6"><h3 className="font-semibold text-white">Mensagem de reativacao</h3><div className="mt-3 flex gap-2"><button onClick={() => generateVariation('amigavel')} className={'rounded-full px-3 py-1.5 text-xs font-semibold ' + (tone === 'amigavel' ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-300')}>Amigavel</button><button onClick={() => generateVariation('oferta')} className={'rounded-full px-3 py-1.5 text-xs font-semibold ' + (tone === 'oferta' ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-300')}>Oferta</button><button onClick={() => generateVariation('direto')} className={'rounded-full px-3 py-1.5 text-xs font-semibold ' + (tone === 'direto' ? 'bg-slate-900 text-white' : 'bg-slate-950 text-slate-300')}>Direto</button></div><textarea value={message} onChange={event => setMessage(event.target.value)} className="mt-3 min-h-28 w-full resize-none rounded-lg border border-slate-800 p-3 text-sm leading-6 outline-none focus:border-slate-900" /><div className="mt-3 flex gap-2"><button disabled={generating} onClick={() => generateVariation()} className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60">{generating ? <LoaderCircle size={14} className="animate-spin" /> : <Sparkles size={14} />}Gerar variacao com IA</button><a href={'https://wa.me/' + client.phone + '?text=' + encodeURIComponent(message)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"><MessageCircle size={14} />Enviar</a></div></div><div className="mt-6"><h3 className="font-semibold text-white">Anotacoes</h3><textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Ex.: prefere degrade baixo..." className="mt-3 min-h-24 w-full resize-none rounded-lg border border-slate-800 p-3 text-sm outline-none focus:border-slate-900" /><button onClick={saveNote} className="mt-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700">Salvar anotacao</button></div><div className="mt-8"><div className="flex items-center justify-between"><h3 className="font-semibold text-white">Historico de disparos</h3><ChevronRight size={16} className="text-slate-400" /></div>{history.length ? <div className="mt-3 space-y-3">{history.map(item => <div key={item.id} className="rounded-lg border border-slate-800 bg-slate-950 p-3"><div className="flex justify-between gap-3 text-xs text-slate-500"><span className="capitalize">{item.status}</span><span>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(item.enviado_em))}</span></div><p className="mt-2 text-sm text-slate-300">{item.mensagem_enviada}</p></div>)}</div> : <p className="mt-3 rounded-lg border border-dashed border-slate-800 px-3 py-4 text-sm text-slate-500">Nenhum disparo registrado ainda.</p>}</div></aside></div>
 }
-function ClientRow({ client, bookingUrl, onSelect }: { client: Client; bookingUrl: string; onSelect: () => void }) {
-  const status = getRetentionStatus(client)
+function ClientRow({ client, bookingUrl, alertDays, missingDays, onSelect }: { client: Client; bookingUrl: string; alertDays: number; missingDays: number; onSelect: () => void }) {
+  const status = getRetentionStatus(client, alertDays, missingDays)
   const statusStyles = {
     sumido: 'bg-rose-500/10 text-rose-300 border border-rose-500/20 font-medium',
     alerta: 'bg-amber-500/10 text-amber-300 border border-amber-500/20',
     em_dia: 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium',
   }[status]
-  const statusLabel = { sumido: '+30 dias', alerta: 'Alerta', em_dia: 'Em dia' }[status]
+  const statusLabel = { sumido: '+' + missingDays + ' dias', alerta: 'Alerta', em_dia: 'Em dia' }[status]
   const overdue = status === 'sumido'
   const vipAtRisk = status === 'sumido'
 

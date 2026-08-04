@@ -19,9 +19,11 @@ export default function ConfiguracoesPage() {
   const [whatsapp, setWhatsapp] = useState('')
   const [cadeirasSimultaneas, setCadeirasSimultaneas] = useState('1')
   const [diasInativo, setDiasInativo] = useState('30')
+  const [diasParaSumido, setDiasParaSumido] = useState('35')
   const [mensagemPadrao, setMensagemPadrao] = useState('Fala, {nome}! Tudo bem? Notamos que ja vai fazer um tempinho desde seu ultimo corte aqui na {barbearia}. Que tal dar aquela moral no visual essa semana? Clica aqui para agendar!')
   const [notifPainel, setNotifPainel] = useState(true)
   const [envioAutomatico, setEnvioAutomatico] = useState(false)
+  const [resgateAutomatico, setResgateAutomatico] = useState(false)
   const [services, setServices] = useState<Service[]>([])
   const [serviceForm, setServiceForm] = useState<ServiceForm>(emptyService)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -39,7 +41,7 @@ export default function ConfiguracoesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setStatus('Sua sessao expirou. Entre novamente.'); return }
       const { data, error } = await supabase.from('perfis_barbearia')
-        .select('nome_estabelecimento,telefone_whatsapp,dias_para_alerta,mensagem_template,cadeiras_simultaneas,notificacoes_painel,envio_assistido')
+        .select('nome_estabelecimento,telefone_whatsapp,dias_para_alerta,dias_para_sumido,mensagem_template,cadeiras_simultaneas,notificacoes_painel,envio_assistido,resgate_automatico_ativo')
         .eq('id', user.id)
         .maybeSingle()
       if (error) { setStatus('Erro ao carregar configuracoes: ' + error.message); return }
@@ -47,10 +49,12 @@ export default function ConfiguracoesPage() {
       if (data.nome_estabelecimento) setNomeBarbearia(data.nome_estabelecimento)
       if (data.telefone_whatsapp) setWhatsapp(data.telefone_whatsapp)
       if (data.dias_para_alerta !== null) setDiasInativo(String(data.dias_para_alerta))
+      if (data.dias_para_sumido !== null) setDiasParaSumido(String(data.dias_para_sumido))
       if (data.mensagem_template) setMensagemPadrao(data.mensagem_template)
       if (data.cadeiras_simultaneas) setCadeirasSimultaneas(String(data.cadeiras_simultaneas))
       setNotifPainel(data.notificacoes_painel !== false)
       setEnvioAutomatico(data.envio_assistido === true)
+      setResgateAutomatico(data.resgate_automatico_ativo === true)
     } catch (error) {
       setStatus('Erro ao carregar configuracoes: ' + (error instanceof Error ? error.message : 'falha inesperada'))
     } finally {
@@ -84,8 +88,10 @@ export default function ConfiguracoesPage() {
     if (!nomeBarbearia.trim() || whatsapp.replace(/\D/g, '').length < 8) { setStatus('Informe o nome da barbearia e um WhatsApp valido.'); return }
     const capacity = Number(cadeirasSimultaneas)
     const alertDays = Number(diasInativo)
+    const missingDays = Number(diasParaSumido)
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 50) { setStatus('Informe uma capacidade entre 1 e 50 cadeiras.'); return }
     if (!Number.isInteger(alertDays) || alertDays < 0) { setStatus('Informe um criterio de inatividade valido.'); return }
+    if (!Number.isInteger(missingDays) || missingDays < 1 || missingDays > 365 || missingDays <= alertDays) { setStatus('Informe um prazo de resgate entre 1 e 365 dias, maior que o alerta.'); return }
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -96,10 +102,12 @@ export default function ConfiguracoesPage() {
         nome_estabelecimento: nomeBarbearia.trim(),
         telefone_whatsapp: whatsapp.trim(),
         dias_para_alerta: alertDays,
+        dias_para_sumido: missingDays,
         mensagem_template: mensagemPadrao,
         cadeiras_simultaneas: capacity,
         notificacoes_painel: notifPainel,
         envio_assistido: envioAutomatico,
+        resgate_automatico_ativo: resgateAutomatico,
       }).eq('id', user.id),
       supabase.from('expedientes').upsert(schedule.map((item) => ({ ...item, user_id: user.id })), { onConflict: 'user_id,dia_semana' }),
     ])
@@ -145,7 +153,7 @@ export default function ConfiguracoesPage() {
 
     <section className={(activeTab === 'geral' ? '' : 'hidden ') + 'space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl lg:p-8'}>
       <Header icon={<Store className="h-5 w-5" />} title="Informacoes do estabelecimento" description="Dados usados no perfil e nas mensagens enviadas aos clientes." />
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2"><Field label="Nome da Barbearia" value={nomeBarbearia} onChange={setNomeBarbearia} /><Field label="WhatsApp de Atendimento" value={whatsapp} onChange={setWhatsapp} type="tel" /><label className="block text-xs font-medium text-slate-400">Dias sem corte para alerta<select value={diasInativo} onChange={(event) => setDiasInativo(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-sm text-white outline-none transition focus:border-emerald-500"><option value="20">20 dias (Ritmo acelerado)</option><option value="30">30 dias (Recomendado)</option><option value="45">45 dias (Espacado)</option><option value="60">60 dias (Critico)</option></select></label></div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2"><Field label="Nome da Barbearia" value={nomeBarbearia} onChange={setNomeBarbearia} /><Field label="WhatsApp de Atendimento" value={whatsapp} onChange={setWhatsapp} type="tel" /><label className="block text-xs font-medium text-slate-400">Dias sem corte para alerta<select value={diasInativo} onChange={(event) => setDiasInativo(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-sm text-white outline-none transition focus:border-emerald-500"><option value="15">15 dias</option><option value="20">20 dias</option><option value="30">30 dias (Recomendado)</option><option value="45">45 dias</option></select></label><label className="block text-xs font-medium text-slate-400">Dias sem corte para resgate automatico<select value={diasParaSumido} onChange={(event) => setDiasParaSumido(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 p-3.5 text-sm text-white outline-none transition focus:border-emerald-500"><option value="20">20 dias</option><option value="30">30 dias</option><option value="35">35 dias (Recomendado)</option><option value="45">45 dias</option><option value="60">60 dias</option></select><span className="mt-2 block text-xs text-slate-500">O cron identifica clientes que atingirem este prazo.</span></label></div>
       <DeleteAccountCard />
     </section>
 
@@ -158,7 +166,7 @@ export default function ConfiguracoesPage() {
     <section className={(activeTab === 'marketing' ? '' : 'hidden ') + 'mt-6 space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl lg:p-8'}>
       <Header icon={<MessageSquare className="h-5 w-5" />} title="Marketing e automacao" description="Personalize o texto padrao usado no resgate via WhatsApp." />
       <label className="block text-xs font-medium text-slate-400">Mensagem Padrao<textarea rows={4} value={mensagemPadrao} onChange={(event) => setMensagemPadrao(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm leading-relaxed text-white outline-none transition focus:border-emerald-500" /><span className="mt-2 block text-xs text-slate-500">Dica: use <code className="text-emerald-400">{'{nome}'}</code> e <code className="text-emerald-400">{'{barbearia}'}</code> para personalizar.</span></label>
-      <div className="space-y-4 border-t border-slate-800 pt-4"><Toggle label="Avisos Sonoros / Visuais no Painel" description="Destacar clientes sumidos no topo da lista principal." checked={notifPainel} onChange={setNotifPainel} /><Toggle label="Modo de Disparo Assistido" description="Otimizar o link direto para o WhatsApp Web ou Mobile." checked={envioAutomatico} onChange={setEnvioAutomatico} /></div>
+      <div className="space-y-4 border-t border-slate-800 pt-4"><Toggle label="Avisos Sonoros / Visuais no Painel" description="Destacar clientes sumidos no topo da lista principal." checked={notifPainel} onChange={setNotifPainel} /><Toggle label="Modo de Disparo Assistido" description="Otimizar o link direto para o WhatsApp Web ou Mobile." checked={envioAutomatico} onChange={setEnvioAutomatico} /><Toggle label="Resgate automatico" description="Enfileirar e enviar mensagens para clientes que atingirem o prazo configurado. Requer provedor WhatsApp conectado pelo administrador." checked={resgateAutomatico} onChange={setResgateAutomatico} /></div>
     </section>
 
 

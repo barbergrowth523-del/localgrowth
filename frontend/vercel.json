@@ -1,7 +1,10 @@
-{
+﻿{
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "git": { "deploymentEnabled": true },
-  "crons": [{ "path": "/api/admin/system/cron", "schedule": "0 12 * * *" }]
+  "crons": [
+    { "path": "/api/admin/system/cron", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/inactivity-rescues", "schedule": "10 12 * * *" }
+  ]
 }
