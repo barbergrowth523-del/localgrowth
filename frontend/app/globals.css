@@ -27,3 +27,5 @@ html.theme-light .placeholder\:text-slate-600::placeholder, html.theme-light .pl
 html.theme-light .hover\:bg-slate-800:hover, html.theme-light .hover\:bg-slate-900:hover, html.theme-light .hover\:bg-slate-900\/50:hover { background-color: #f3f4f6 !important; }
 html.theme-light .hover\:text-white:hover { color: #1f2937 !important; }
 html.theme-light .shadow-2xl, html.theme-light .shadow-xl, html.theme-light .shadow-lg { box-shadow: 0 14px 32px rgb(31 41 55 / 0.08) !important; }
+html.theme-light input:not([type='checkbox']):not([type='radio']), html.theme-light select, html.theme-light textarea { background-color: #ffffff; border-color: #e5e7eb; color: #1f2937; }
+html.theme-light table thead { background-color: #f9fafb; }
