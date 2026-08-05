@@ -67,15 +67,12 @@ export function OnboardingTour() {
         return
       }
 
-      const { data, error } = await supabase
-        .from('lojista_onboarding')
-        .select('completed_at,skipped_at')
-        .eq('user_id', user.id)
-        .maybeSingle()
+      const response = await fetch('/api/onboarding', { cache: 'no-store' })
+      const onboarding = await response.json() as { completed?: boolean; error?: string }
 
       if (!active) return
-      if (error) console.error('[onboarding] state lookup failed', error.code)
-      if (data?.completed_at || data?.skipped_at) {
+      if (!response.ok) console.error('[onboarding] state lookup failed', onboarding.error ?? response.status)
+      if (onboarding.completed) {
         markTourCompleted(user.id)
         setVisible(false)
         setPosition(null)
@@ -150,11 +147,19 @@ export function OnboardingTour() {
     clearDemo()
     setVisible(false)
 
-    const now = new Date().toISOString()
-    const { error } = await createClient()
-      .from('lojista_onboarding')
-      .upsert({ user_id: userId, [kind]: now, updated_at: now }, { onConflict: 'user_id' })
-    if (error) console.error('[onboarding] unable to persist completion', error.code)
+    try {
+      const response = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: kind === 'completed_at' ? 'completed' : 'skipped' }),
+      })
+      if (!response.ok) {
+        const result = await response.json() as { error?: string }
+        console.error('[onboarding] unable to persist completion', result.error ?? response.status)
+      }
+    } catch (error) {
+      console.error('[onboarding] unable to persist completion', error instanceof Error ? error.message : 'unknown error')
+    }
   }
 
   async function finish() {

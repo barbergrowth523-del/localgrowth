@@ -85,6 +85,9 @@ export default function AssinaturaPage() {
   const requestedPlan = searchParams.get('plano')?.toLowerCase()
   const urlPlan: PlanId | null = requestedPlan === 'starter' || requestedPlan === 'pro' || requestedPlan === 'scale' ? requestedPlan : null
   const [selectedPlan, setSelectedPlan] = useState<PlanId>(() => urlPlan ?? 'pro')
+  // A plan requested by a protected Scale feature is authoritative for this checkout.
+  // It prevents a default state from briefly restoring the Pro card before the effect runs.
+  const activePlanId: PlanId = urlPlan ?? selectedPlan
   const [isOnboardingOffer, setIsOnboardingOffer] = useState(false)
   const [annual, setAnnual] = useState(false)
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
@@ -96,7 +99,7 @@ export default function AssinaturaPage() {
   const [copiado, setCopiado] = useState(false)
   const [message, setMessage] = useState('')
   const [formData, setFormData] = useState<FormData>(initialForm)
-  const plan = useMemo(() => plans.find((item) => item.id === selectedPlan) ?? plans[1], [selectedPlan])
+  const plan = useMemo(() => plans.find((item) => item.id === activePlanId) ?? plans[1], [activePlanId])
   const price = annual ? plan.price * 10 : plan.price
   const monthlyEquivalent = annual ? plan.price * 10 / 12 : plan.price
   const daysRemaining = getDaysRemaining(subscription?.expiresAt ?? '')
@@ -152,7 +155,7 @@ export default function AssinaturaPage() {
     event.preventDefault(); setLoading(true); setMessage('')
     try {
       const response = await fetch('/api/pagamento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        customerName: formData.name, email: formData.email, cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''), billingType: metodo, planId: selectedPlan, annual,
+        customerName: formData.name, email: formData.email, cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''), billingType: metodo, planId: activePlanId, annual,
         creditCard: metodo === 'CREDIT_CARD' ? { holderName: formData.holderName, number: formData.cardNumber.replace(/\s/g, ''), expiryMonth: formData.cardExpiryMonth, expiryYear: formData.cardExpiryYear, ccv: formData.cardCCV } : undefined,
         creditCardHolderInfo: metodo === 'CREDIT_CARD' ? { name: formData.holderName, email: formData.email, cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''), postalCode: formData.postalCode.replace(/\D/g, ''), addressNumber: formData.addressNumber.trim(), phone: formData.phone.replace(/\D/g, '') } : undefined,
       }) })
@@ -217,9 +220,9 @@ export default function AssinaturaPage() {
         </section>
       )}
       <div id="planos" className="mb-4 flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">Etapa 1</span><div><h2 className="text-sm font-bold text-white">Compare os planos</h2><p className="text-xs text-slate-500">Selecione o nivel ideal para sua operacao.</p></div></div><div className="mb-7 grid grid-cols-1 gap-4 md:grid-cols-3">
-        {plans.map((item) => <button id={'plano-' + item.id} key={item.id} type="button" onClick={() => setSelectedPlan(item.id)} aria-pressed={selectedPlan === item.id} className={'relative text-left rounded-2xl border p-5 outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ' + (selectedPlan === item.id ? 'border-emerald-500 bg-emerald-500/10 shadow-xl shadow-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700')}>
+        {plans.map((item) => <button id={'plano-' + item.id} key={item.id} type="button" onClick={() => setSelectedPlan(item.id)} aria-pressed={activePlanId === item.id} className={'relative text-left rounded-2xl border p-5 outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ' + (activePlanId === item.id ? 'border-emerald-500 bg-emerald-500/10 shadow-xl shadow-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700')}>
           {item.popular && <span className="absolute -top-3 right-4 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-950">Mais Popular</span>}
-          <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-bold text-white">{item.name}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p></div>{selectedPlan === item.id && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />}</div>
+          <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-bold text-white">{item.name}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p></div>{activePlanId === item.id && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />}</div>
           <div className="mt-5 flex items-baseline gap-1"><span className="text-3xl font-extrabold text-white">R$ {item.price}</span><span className="text-xs text-slate-500">/ mes</span></div><p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300"><ShieldCheck className="h-3.5 w-3.5" /> 7 dias gratis no cartao</p>
           <ul className="mt-5 space-y-2 text-xs text-slate-300">{item.features.map((feature) => <li key={feature} className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400" />{feature}</li>)}</ul>
         </button>)}
