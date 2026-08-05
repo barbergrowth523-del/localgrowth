@@ -1,17 +1,31 @@
 'use client'
 
-import { Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import { Sparkles, User } from 'lucide-react'
 import { NotificationCenter } from '@/components/dashboard/NotificationCenter'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
+import { useAuth } from '@/components/auth/AuthProvider'
+
+const formatPlan = (value: string) => {
+  const clean = value.replace(/^plano\s+/i, '').trim()
+  return clean ? clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase() : 'Starter'
+}
 
 export function PanelTopbar() {
+  const { user, plan, subscriptionActive } = useAuth()
+  const profileName = user?.email?.split('@')[0] || 'Perfil'
+  const planLabel = `Plano ${formatPlan(plan)}`
+
   return <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur-xl">
-    <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
+    <div className="flex h-16 w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
       <div className="flex items-center gap-2" aria-label="Acoes do painel">
         <ThemeToggle iconOnly />
         <NotificationCenter inline />
       </div>
-      <span className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:inline-flex"><Sparkles className="h-4 w-4 text-emerald-400" /> Painel Prontusfy</span>
+      <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
+        <Link href="/assinatura" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:border-emerald-400/60 hover:bg-emerald-500/20 hover:shadow-[0_0_18px_rgba(52,211,153,0.15)]"><Sparkles size={14} className="text-emerald-400" /><span className="hidden sm:inline">{planLabel} {subscriptionActive ? 'Ativo' : ''}</span><span className="sm:hidden">{formatPlan(plan)}</span></Link>
+        <span className="flex min-w-0 items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-300"><User size={15} className="shrink-0 text-emerald-400" /><span className="max-w-28 truncate sm:max-w-44">{profileName}</span></span>
+      </div>
     </div>
   </header>
 }
