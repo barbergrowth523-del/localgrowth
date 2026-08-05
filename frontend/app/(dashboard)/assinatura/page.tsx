@@ -105,9 +105,15 @@ export default function AssinaturaPage() {
   const update = (key: keyof FormData, value: string) => setFormData((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('onboarding') === '1') {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('onboarding') === '1') {
       setIsOnboardingOffer(true)
       setMetodo('CREDIT_CARD')
+    }
+
+    const requestedPlan = params.get('plano')?.toLowerCase()
+    if (requestedPlan === 'starter' || requestedPlan === 'pro' || requestedPlan === 'scale') {
+      setSelectedPlan(requestedPlan)
     }
   }, [])
 

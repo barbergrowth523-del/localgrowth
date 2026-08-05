@@ -37,34 +37,53 @@ export function OnboardingTour() {
   }, [current.key])
 
   useEffect(() => {
+    let active = true
+
     void (async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || !active) return
+
       setUserId(user.id)
       const localKey = `prontusfy-onboarding-${user.id}`
-      const isTestAccount = user.email?.trim().toLowerCase() === 'afiliadopro500@gmail.com'
       const tourRoutes = new Set(steps.map((item) => item.route))
-      const tourNavigation = new URLSearchParams(window.location.search).get('tour') === '1'
+      const query = new URLSearchParams(window.location.search)
+      const tourNavigation = query.get('tour') === '1'
       if (!tourRoutes.has(pathname) || (pathname !== '/dashboard' && !tourNavigation)) return
-      if (!isTestAccount && window.localStorage.getItem(localKey) === 'done') return
-      const savedStepValue = window.localStorage.getItem(localKey + '-step')
-      const savedStep = Number(savedStepValue)
-      const queryStep = Number(new URLSearchParams(window.location.search).get('tourStep'))
+
+      if (window.localStorage.getItem(localKey) === 'done') return
+
+      const { data, error } = await supabase
+        .from('lojista_onboarding')
+        .select('completed_at,skipped_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!active) return
+      if (error) console.error('[onboarding] state lookup failed', error.code)
+      if (data?.completed_at || data?.skipped_at) {
+        window.localStorage.setItem(localKey, 'done')
+        window.localStorage.removeItem(`${localKey}-step`)
+        return
+      }
+
+      const savedStep = Number(window.localStorage.getItem(`${localKey}-step`))
+      const queryStep = Number(query.get('tourStep'))
       const hasSavedStep = Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length
       const hasQueryStep = tourNavigation && Number.isInteger(queryStep) && queryStep >= 0 && queryStep < steps.length
-      if (isTestAccount && !hasSavedStep && !hasQueryStep && pathname !== '/dashboard') return
       const initialStep = hasQueryStep ? queryStep : hasSavedStep ? savedStep : 0
+
       setStep(initialStep)
-      window.localStorage.setItem(localKey + '-step', String(initialStep))
+      window.localStorage.setItem(`${localKey}-step`, String(initialStep))
       if (steps[initialStep].route !== pathname) {
         router.replace(`${steps[initialStep].route}?tour=1&tourStep=${initialStep}`)
         return
       }
-      const { data, error } = await supabase.from('lojista_onboarding').select('completed_at,skipped_at').eq('user_id', user.id).maybeSingle()
-      if (error) console.error('[onboarding] state lookup failed', error.code)
-      if (isTestAccount || (!data?.completed_at && !data?.skipped_at)) setVisible(true)
+
+      setVisible(true)
     })()
+
+    return () => { active = false }
   }, [pathname, router])
 
   useEffect(() => {

@@ -22,7 +22,7 @@ export function ScalePaywall({ children }: { children: React.ReactNode }) {
           </div>
           <h2 className="mt-2 text-lg font-bold text-white sm:text-xl">Recurso exclusivo do Plano Scale</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">Ative o Plano Scale para liberar equipe, relatorios e recursos avancados.</p>
-          <Link href="/assinatura" className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400">
+          <Link href="/assinatura?plano=scale" className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400">
             Fazer upgrade
           </Link>
         </div>
