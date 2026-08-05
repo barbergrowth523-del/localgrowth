@@ -57,6 +57,7 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
           email: normalizedEmail,
           password,
           options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/assinatura?onboarding=1')}`,
             data: {
               nome_responsavel: responsibleName.trim(),
               nome_barbearia: barbershopName.trim(),
@@ -69,7 +70,7 @@ export function LoginForm({ initialMode = 'login' }: { initialMode?: 'login' | '
         if (data.session) {
           window.localStorage.removeItem(`prontusfy-onboarding-${data.user?.id ?? 'unknown'}`)
           if (data.user?.id) window.localStorage.setItem(`prontusfy-welcome-${data.user.id}`, 'pending')
-          window.location.replace('/dashboard?tour=1&tourStep=0')
+          window.location.replace('/assinatura?onboarding=1')
           return
         }
 

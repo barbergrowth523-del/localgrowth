@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const ADMIN_EMAIL = 'barbergrowth523@gmail.com'
@@ -20,5 +20,7 @@ export async function GET(request: Request) {
     isAdmin = profile?.role === 'admin'
   }
 
-  return NextResponse.redirect(new URL(isAdmin ? '/admin/dashboard' : '/dashboard', url))
+  const next = url.searchParams.get('next')
+  const safeNext = next?.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
+  return NextResponse.redirect(new URL(isAdmin ? '/admin/dashboard' : safeNext, url))
 }
