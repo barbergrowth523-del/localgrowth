@@ -7,3 +7,23 @@
 body { margin: 0; background: var(--cream); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
 button, input { font: inherit; }
 .noise { background-image: radial-gradient(#dce5dd 0.55px, transparent 0.55px); background-size: 7px 7px; }
+
+/* Global light theme: maps the existing slate design system to accessible light surfaces. */
+html.theme-light { color-scheme: light; }
+html.theme-light body { background: #f8fafc !important; color: #0f172a; }
+html.theme-light .bg-slate-950 { background-color: #f8fafc !important; }
+html.theme-light .bg-slate-950\/95, html.theme-light .bg-slate-950\/80, html.theme-light .bg-slate-950\/70 { background-color: rgb(248 250 252 / 0.95) !important; }
+html.theme-light .bg-slate-900 { background-color: #ffffff !important; }
+html.theme-light .bg-slate-900\/95, html.theme-light .bg-slate-900\/70, html.theme-light .bg-slate-900\/50 { background-color: rgb(255 255 255 / 0.94) !important; }
+html.theme-light .bg-slate-800 { background-color: #e2e8f0 !important; }
+html.theme-light .bg-slate-800\/50 { background-color: rgb(226 232 240 / 0.65) !important; }
+html.theme-light .border-slate-900, html.theme-light .border-slate-800 { border-color: #dbe3ee !important; }
+html.theme-light .border-slate-700 { border-color: #cbd5e1 !important; }
+html.theme-light .text-white { color: #0f172a !important; }
+html.theme-light .text-slate-200, html.theme-light .text-slate-300 { color: #334155 !important; }
+html.theme-light .text-slate-400 { color: #475569 !important; }
+html.theme-light .text-slate-500, html.theme-light .text-slate-600 { color: #64748b !important; }
+html.theme-light .placeholder\:text-slate-600::placeholder { color: #94a3b8 !important; }
+html.theme-light .hover\:bg-slate-800:hover, html.theme-light .hover\:bg-slate-900:hover, html.theme-light .hover\:bg-slate-900\/50:hover { background-color: #e2e8f0 !important; }
+html.theme-light .hover\:text-white:hover { color: #0f172a !important; }
+html.theme-light .shadow-2xl, html.theme-light .shadow-xl { box-shadow: 0 16px 36px rgb(15 23 42 / 0.10) !important; }
