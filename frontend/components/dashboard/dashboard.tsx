@@ -34,16 +34,12 @@ function buildWhatsAppMessage(name: string, bookingUrl: string) {
   const callToAction = bookingUrl ? ' Escolha seu horario direto aqui: ' + bookingUrl : ''
   return 'Oi, ' + name.split(' ')[0] + '! Tudo bem? Ja faz um tempinho desde seu ultimo corte. Quer reservar um horario?' + callToAction
 }
-export function Dashboard({ userEmail }: { userEmail: string }) {
-  const fallbackName = userEmail === 'barbergrowth523@gmail.com' ? 'Samuel Santos' : (userEmail.split('@')[0] || 'Usuario').replace(/[._-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
-  const [profileName, setProfileName] = useState('')
+export function Dashboard() {
   const searchParams = useSearchParams()
   const tourDemo = searchParams.get('tour') === '1' && searchParams.get('tourStep') === '5'
   const [bookingLink, setBookingLink] = useState('')
   const [alertDays, setAlertDays] = useState(25)
   const [missingDays, setMissingDays] = useState(35)
-  const displayName = profileName || fallbackName
-  const firstName = displayName.split(' ')[0] || 'Usuario'
   const [clients, setClients] = useState<Client[]>([]); const [isUploading, setIsUploading] = useState(false); const [searchTerm, setSearchTerm] = useState(''); const [status, setStatus] = useState(''); const [frequencyFilter, setFrequencyFilter] = useState('todos'); const [selectedClient, setSelectedClient] = useState<Client | null>(null); const fileRef = useRef<HTMLInputElement>(null)
   async function loadClients() {
     const supabase = createClient()
@@ -55,9 +51,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
     ])
     const profile = primaryProfile.data as Record<string, unknown> | null
     const profileValue = (keys: string[]) => keys.map((key) => profile?.[key]).find((value) => typeof value === 'string' && value.trim()) as string | undefined
-    const savedName = profileValue(['nome_estabelecimento', 'nome', 'nome_completo', 'name', 'nome_barbearia', 'barbearia_nome'])
     const savedSlug = profileValue(['slug'])
-    if (savedName) setProfileName(savedName.trim())
     if (savedSlug) setBookingLink(window.location.origin + '/agendar?barbearia=' + encodeURIComponent(savedSlug))
     const configuredAlertDays = Number(profile?.dias_para_alerta)
     const configuredMissingDays = Number(profile?.dias_para_sumido)
@@ -117,7 +111,7 @@ export function Dashboard({ userEmail }: { userEmail: string }) {
   const atRisk = sumidoCount * 60
   const estimatedRecoveries = Math.min(sumidoCount, 2)
   const roiMultiple = estimatedRecoveries === 0 ? 0 : estimatedRecoveries
-  return <main className="min-h-screen bg-slate-950"><header className="border-b border-slate-800 bg-slate-950"><div className="mx-auto max-w-7xl px-6 py-6 lg:px-10"><p className="truncate text-2xl font-bold tracking-tight text-white sm:text-3xl">Bom dia, {firstName}</p></div></header>
+  return <main className="min-h-screen bg-slate-950">
     <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10"><div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 w-full"><div><p className="text-sm font-medium text-emerald-400">Visao geral</p><p className="mt-2 text-slate-400">Veja quem esta esperando por um novo corte.</p></div><div><input ref={fileRef} type="file" accept=".csv,text/csv" onChange={importCsv} className="hidden" /><button disabled={isUploading} onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"><FileUp size={17} /> {isUploading ? 'Importando...' : 'Importar planilha CSV'}</button></div></div>
       {status && <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"><CheckCircle2 size={17} />{status}</div>}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4"><MoneyOnTableCard value={atRisk} sumidoCount={sumidoCount} /><RoiBadge multiple={roiMultiple} recoveries={estimatedRecoveries} /><Stat icon={<Users size={18} />} label="Total de clientes" value={dashboardClients.length} /><Stat icon={<CalendarDays size={18} />} label="Cortes este mes" value={dashboardClients.filter(c => new Date(c.last_cut_at).getMonth() === new Date().getMonth()).length} /></div>
