@@ -6,7 +6,6 @@ import { BarChart3, CalendarDays, CreditCard, LayoutDashboard, LogOut, Settings,
 import BrandLogo from '@/components/BrandLogo'
 import { BRAND_NAME } from '@/lib/brand'
 import { createClient } from '@/lib/supabase/client'
-import { ThemeToggle } from '@/components/theme/ThemeToggle'
 
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -29,7 +28,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="hidden min-h-screen w-64 shrink-0 flex-col justify-between border-r border-slate-800 bg-slate-950 p-2 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden h-screen w-64 flex-col justify-between overflow-y-auto border-r border-slate-800 bg-slate-950 p-2 lg:flex">
         <div>
           <div className="mb-1 flex flex-col items-center justify-center p-0"><BrandLogo className="w-full" markClassName="h-auto w-full max-w-[180px]" /></div>
 
@@ -58,7 +57,7 @@ export default function Sidebar() {
           </nav>
         </div>
 
-        <div className="border-t border-slate-900 pt-4"><ThemeToggle />
+        <div className="border-t border-slate-900 pt-4">
           <button onClick={signOut} className="mb-4 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-300" aria-label="Sair da conta" title="Sair da conta">
             <LogOut className="h-5 w-5" />
             Sair da conta
@@ -68,7 +67,7 @@ export default function Sidebar() {
       </aside>
 
       <nav aria-label="Menu principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-950/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl backdrop-blur-lg lg:hidden">
-        <div className="flex min-w-max gap-1"><ThemeToggle compact />
+        <div className="flex min-w-max gap-1">
           {menuItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href

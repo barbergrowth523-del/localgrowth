@@ -4,9 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import { SupportChat } from '@/components/support/SupportChat'
 import { GlobalBroadcastBanner } from '@/components/dashboard/GlobalBroadcastBanner'
-import { NotificationCenter } from '@/components/dashboard/NotificationCenter'
 import { OnboardingTour } from '@/components/dashboard/OnboardingTour'
 import { WelcomeMessage } from '@/components/dashboard/WelcomeMessage'
+import { PanelTopbar } from '@/components/dashboard/PanelTopbar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionClient = await createClient()
@@ -36,11 +36,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <AuthProvider initialUser={{ id: user.id, email: user.email }} initialPlan={initialPlan} initialSubscriptionActive={initialSubscriptionActive}>
-      <div className="flex min-h-screen overflow-x-hidden bg-slate-950 text-white">
+      <div className="min-h-screen overflow-x-hidden bg-slate-950 text-white">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto pb-24 lg:pb-0">{children}</main>
+        <main className="min-w-0 pb-24 lg:ml-64 lg:pb-0"><PanelTopbar />{children}</main>
       </div>
-      <NotificationCenter />
       <OnboardingTour />
       <WelcomeMessage userId={user.id} barbershopName={profile.nome_estabelecimento} />
       <GlobalBroadcastBanner />
