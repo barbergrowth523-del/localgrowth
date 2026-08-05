@@ -17,6 +17,15 @@ const steps: Step[] = [
 ]
 type Position = { top: number; left: number; width: number; height: number; placement: 'top' | 'right' | 'bottom' | 'left' }
 
+const completionKey = (userId: string) => `prontusfy_tour_completed:${userId}`
+const legacyCompletionKey = (userId: string) => `prontusfy-onboarding-${userId}`
+
+function markTourCompleted(userId: string) {
+  window.localStorage.setItem(completionKey(userId), 'true')
+  window.localStorage.setItem(legacyCompletionKey(userId), 'done')
+  window.localStorage.removeItem(`${legacyCompletionKey(userId)}-step`)
+}
+
 export function OnboardingTour() {
   const router = useRouter()
   const pathname = usePathname()
@@ -45,13 +54,18 @@ export function OnboardingTour() {
       if (!user || !active) return
 
       setUserId(user.id)
-      const localKey = `prontusfy-onboarding-${user.id}`
+      const localKey = legacyCompletionKey(user.id)
+      const completedKey = completionKey(user.id)
       const tourRoutes = new Set(steps.map((item) => item.route))
       const query = new URLSearchParams(window.location.search)
       const tourNavigation = query.get('tour') === '1'
       if (!tourRoutes.has(pathname) || (pathname !== '/dashboard' && !tourNavigation)) return
 
-      if (window.localStorage.getItem(localKey) === 'done') return
+      if (window.localStorage.getItem(completedKey) === 'true' || window.localStorage.getItem(localKey) === 'done') {
+        setVisible(false)
+        setPosition(null)
+        return
+      }
 
       const { data, error } = await supabase
         .from('lojista_onboarding')
@@ -62,8 +76,9 @@ export function OnboardingTour() {
       if (!active) return
       if (error) console.error('[onboarding] state lookup failed', error.code)
       if (data?.completed_at || data?.skipped_at) {
-        window.localStorage.setItem(localKey, 'done')
-        window.localStorage.removeItem(`${localKey}-step`)
+        markTourCompleted(user.id)
+        setVisible(false)
+        setPosition(null)
         return
       }
 
@@ -128,23 +143,26 @@ export function OnboardingTour() {
     window.dispatchEvent(new Event('prontusfy-tour-ended'))
   }
 
-  async function finish() {
+  async function persistTourEnd(kind: 'completed_at' | 'skipped_at') {
     if (!userId) return
-    const now = new Date().toISOString()
-    await createClient().from('lojista_onboarding').upsert({ user_id: userId, completed_at: now, updated_at: now }, { onConflict: 'user_id' })
-    window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
-    window.localStorage.removeItem(`prontusfy-onboarding-${userId}-step`)
+
+    markTourCompleted(userId)
     clearDemo()
     setVisible(false)
+
+    const now = new Date().toISOString()
+    const { error } = await createClient()
+      .from('lojista_onboarding')
+      .upsert({ user_id: userId, [kind]: now, updated_at: now }, { onConflict: 'user_id' })
+    if (error) console.error('[onboarding] unable to persist completion', error.code)
   }
+
+  async function finish() {
+    await persistTourEnd('completed_at')
+  }
+
   async function skip() {
-    if (!userId) return
-    const now = new Date().toISOString()
-    await createClient().from('lojista_onboarding').upsert({ user_id: userId, skipped_at: now, updated_at: now }, { onConflict: 'user_id' })
-    window.localStorage.setItem(`prontusfy-onboarding-${userId}`, 'done')
-    window.localStorage.removeItem(`prontusfy-onboarding-${userId}-step`)
-    clearDemo()
-    setVisible(false)
+    await persistTourEnd('skipped_at')
   }
   function next() {
     scrollRequested.current = null

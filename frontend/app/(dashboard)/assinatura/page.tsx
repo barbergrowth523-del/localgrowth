@@ -1,8 +1,8 @@
 'use client'
 
 import { ArrowRight, CalendarDays, Check, CheckCircle2, Copy, CreditCard, Lock, QrCode, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
-import { FormEvent, useMemo, useState } from 'react'
-import { useEffect } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { BRAND_NAME } from '@/lib/brand'
 import { LegalLinks } from '@/components/legal/LegalLinks'
@@ -81,7 +81,10 @@ const getValidityProgress = (subscription: SubscriptionInfo | null) => {
   return Math.max(0, Math.min(100, ((expires - today) / (expires - started)) * 100))
 }
 export default function AssinaturaPage() {
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>('pro')
+  const searchParams = useSearchParams()
+  const requestedPlan = searchParams.get('plano')?.toLowerCase()
+  const urlPlan: PlanId | null = requestedPlan === 'starter' || requestedPlan === 'pro' || requestedPlan === 'scale' ? requestedPlan : null
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>(() => urlPlan ?? 'pro')
   const [isOnboardingOffer, setIsOnboardingOffer] = useState(false)
   const [annual, setAnnual] = useState(false)
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
@@ -105,17 +108,20 @@ export default function AssinaturaPage() {
   const update = (key: keyof FormData, value: string) => setFormData((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('onboarding') === '1') {
+    if (searchParams.get('onboarding') === '1') {
       setIsOnboardingOffer(true)
       setMetodo('CREDIT_CARD')
     }
 
-    const requestedPlan = params.get('plano')?.toLowerCase()
-    if (requestedPlan === 'starter' || requestedPlan === 'pro' || requestedPlan === 'scale') {
-      setSelectedPlan(requestedPlan)
-    }
-  }, [])
+    if (!urlPlan) return
+    setSelectedPlan(urlPlan)
+    const focusTimer = window.setTimeout(() => {
+      const planCard = document.getElementById(`plano-${urlPlan}`)
+      planCard?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      planCard?.focus({ preventScroll: true })
+    }, 0)
+    return () => window.clearTimeout(focusTimer)
+  }, [searchParams, urlPlan])
 
   useEffect(() => {
     let active = true
@@ -211,7 +217,7 @@ export default function AssinaturaPage() {
         </section>
       )}
       <div id="planos" className="mb-4 flex items-center gap-3"><span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">Etapa 1</span><div><h2 className="text-sm font-bold text-white">Compare os planos</h2><p className="text-xs text-slate-500">Selecione o nivel ideal para sua operacao.</p></div></div><div className="mb-7 grid grid-cols-1 gap-4 md:grid-cols-3">
-        {plans.map((item) => <button key={item.id} type="button" onClick={() => setSelectedPlan(item.id)} className={'relative text-left rounded-2xl border p-5 transition ' + (selectedPlan === item.id ? 'border-emerald-500 bg-emerald-500/10 shadow-xl shadow-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700')}>
+        {plans.map((item) => <button id={'plano-' + item.id} key={item.id} type="button" onClick={() => setSelectedPlan(item.id)} aria-pressed={selectedPlan === item.id} className={'relative text-left rounded-2xl border p-5 outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ' + (selectedPlan === item.id ? 'border-emerald-500 bg-emerald-500/10 shadow-xl shadow-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700')}>
           {item.popular && <span className="absolute -top-3 right-4 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-950">Mais Popular</span>}
           <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-bold text-white">{item.name}</p><p className="mt-1 text-xs leading-5 text-slate-400">{item.description}</p></div>{selectedPlan === item.id && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />}</div>
           <div className="mt-5 flex items-baseline gap-1"><span className="text-3xl font-extrabold text-white">R$ {item.price}</span><span className="text-xs text-slate-500">/ mes</span></div><p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300"><ShieldCheck className="h-3.5 w-3.5" /> 7 dias gratis no cartao</p>
