@@ -251,3 +251,66 @@ html.theme-light .border-rose-500\/30 { border-color: var(--red-border) !importa
 html.theme-light .bg-sky-500\/10 { background-color: var(--blue-soft) !important; }
 html.theme-light .border-sky-500\/20,
 html.theme-light .border-sky-500\/30 { border-color: var(--blue-border) !important; }
+/* Dashboard composition: metric cards, insight panels and a compact client workspace. */
+[data-dashboard] .dashboard-metrics > [data-light-tone] {
+  min-height: 196px;
+  position: relative;
+  overflow: hidden;
+}
+[data-dashboard] .dashboard-metrics > [data-light-tone]::after {
+  content: '';
+  position: absolute;
+  right: 1.15rem;
+  bottom: 1rem;
+  width: 3.25rem;
+  height: 1px;
+  background: currentColor;
+  opacity: .36;
+  transform: skewX(-32deg);
+}
+[data-dashboard] .dashboard-metrics [data-light-only],
+[data-dashboard] .dashboard-metrics [data-light-icon] {
+  width: 3.7rem;
+  height: 3.7rem;
+  border-radius: 999px;
+}
+[data-dashboard] .dashboard-metrics [data-light-only] { background: var(--brand-soft); color: var(--brand); }
+[data-dashboard] .dashboard-metrics > [data-light-tone='purple'] [data-light-icon] { background: var(--purple-soft); color: #7c3aed; }
+[data-dashboard] .dashboard-metrics > [data-light-tone='blue'] [data-light-icon] { background: var(--blue-soft); color: #2563eb; }
+[data-dashboard] .dashboard-metrics > [data-light-tone='roi'] [data-light-only] { background: rgb(255 255 255 / .62); }
+[data-dashboard] .dashboard-insights > [data-light-tone] { margin-bottom: 0; min-height: 258px; }
+[data-dashboard] .dashboard-birthday-empty { min-height: 145px; display: grid; place-content: center; }
+[data-dashboard] [data-light-tone='clients-table'] { border-radius: 1rem; }
+[data-dashboard] [data-light-tone='clients-table'] thead th { letter-spacing: .06em; }
+
+html.theme-light [data-dashboard] { background: #f6f8fb !important; }
+html.theme-light [data-dashboard] .dashboard-intro h1 { color: #172033 !important; }
+html.theme-light [data-dashboard] .dashboard-intro p:not(.text-emerald-400) { color: #52627a !important; }
+html.theme-light [data-dashboard] .dashboard-metrics > [data-light-tone] { box-shadow: 0 10px 28px rgb(15 23 42 / .06); }
+html.theme-light [data-dashboard] .dashboard-metrics > [data-light-tone='green'] { background: linear-gradient(145deg, #ffffff 18%, #effcf6) !important; }
+html.theme-light [data-dashboard] .dashboard-metrics > [data-light-tone='roi'] { background: linear-gradient(145deg, #ffffff 12%, #e9fbf3) !important; }
+html.theme-light [data-dashboard] .dashboard-metrics > [data-light-tone='purple'] { background: linear-gradient(145deg, #ffffff 12%, #fbf8ff) !important; }
+html.theme-light [data-dashboard] .dashboard-metrics > [data-light-tone='blue'] { background: linear-gradient(145deg, #ffffff 12%, #f6faff) !important; }
+html.theme-light [data-dashboard] .dashboard-metrics .text-white { color: #172033 !important; }
+html.theme-light [data-dashboard] .dashboard-metrics .text-slate-300 { color: #52627a !important; }
+html.theme-light [data-dashboard] [data-light-tone='birthday'] { background: linear-gradient(135deg, #fffdf7, #fff9ed) !important; }
+html.theme-light [data-dashboard] [data-light-tone='health'] { background: linear-gradient(135deg, #fbfdff, #f3f8ff) !important; }
+html.theme-light [data-dashboard] [data-light-tone='health'] h3 { color: #1769e0 !important; }
+html.theme-light [data-dashboard] .dashboard-birthday-empty { background-image: radial-gradient(circle at 15% 20%, rgb(251 191 36 / .18) 0 2px, transparent 3px), radial-gradient(circle at 85% 70%, rgb(56 189 248 / .15) 0 2px, transparent 3px); background-size: 42px 42px; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] { background: #ffffff !important; border-color: #e2e8f0 !important; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] thead { background: #f8fafc !important; color: #64748b !important; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] td { border-color: #e8eef6 !important; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] .text-slate-200 { color: #1f2937 !important; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] .text-slate-400,
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] .text-slate-500 { color: #64748b !important; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] input,
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] select { background: #ffffff !important; color: #334155 !important; border-color: #dbe3ef !important; }
+html.theme-light [data-dashboard] [data-light-tone='clients-table'] input::placeholder { color: #94a3b8 !important; }
+
+html:not(.theme-light) [data-dashboard] .dashboard-metrics > [data-light-tone] { min-height: 174px; }
+html:not(.theme-light) [data-dashboard] .dashboard-insights > [data-light-tone] { background: var(--surface) !important; }
+
+@media (max-width: 639px) {
+  [data-dashboard] .dashboard-metrics > [data-light-tone] { min-height: 155px; }
+  [data-dashboard] .dashboard-insights > [data-light-tone] { min-height: 0; }
+}
