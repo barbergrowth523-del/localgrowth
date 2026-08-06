@@ -21,8 +21,8 @@ html.theme-light .border-slate-900, html.theme-light .border-slate-800, html.the
 html.theme-light .divide-slate-800 > :not([hidden]) ~ :not([hidden]), html.theme-light .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: #e5e7eb !important; }
 html.theme-light .text-white, html.theme-light .text-slate-200 { color: #1f2937 !important; }
 html.theme-light .text-slate-300 { color: #374151 !important; }
-html.theme-light .text-slate-400 { color: #4b5563 !important; }
-html.theme-light .text-slate-500, html.theme-light .text-slate-600 { color: #6b7280 !important; }
+html.theme-light .text-slate-400, html.theme-light .text-slate-500 { color: #4b5563 !important; }
+html.theme-light .text-slate-600 { color: #6b7280 !important; }
 html.theme-light .placeholder\:text-slate-600::placeholder, html.theme-light .placeholder\:text-slate-500::placeholder { color: #9ca3af !important; }
 html.theme-light .hover\:bg-slate-800:hover, html.theme-light .hover\:bg-slate-900:hover, html.theme-light .hover\:bg-slate-900\/50:hover { background-color: #f3f4f6 !important; }
 html.theme-light .hover\:text-white:hover { color: #1f2937 !important; }
