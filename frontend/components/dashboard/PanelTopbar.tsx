@@ -17,7 +17,7 @@ export function PanelTopbar() {
   const greetingName = profileName.split(/[._-]+/).filter(Boolean)[0] || profileName
   const planLabel = `Plano ${formatPlan(plan)}`
 
-  return <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur-xl">
+  return <header className="prontusfy-topbar sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur-xl">
     <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
       <div className="flex items-center gap-2">
         <ThemeToggle iconOnly />

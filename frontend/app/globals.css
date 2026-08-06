@@ -29,3 +29,12 @@ html.theme-light .hover\:text-white:hover { color: #1f2937 !important; }
 html.theme-light .shadow-2xl, html.theme-light .shadow-xl, html.theme-light .shadow-lg { box-shadow: 0 14px 32px rgb(31 41 55 / 0.08) !important; }
 html.theme-light input:not([type='checkbox']):not([type='radio']), html.theme-light select, html.theme-light textarea { background-color: #ffffff; border-color: #e5e7eb; color: #1f2937; }
 html.theme-light table thead { background-color: #f9fafb; }
+
+/* Light Mode charcoal shell: structural surfaces stay dark while content cards remain white. */
+html.theme-light body { background: #1e222b !important; }
+html.theme-light .prontusfy-shell, html.theme-light .prontusfy-shell > main, html.theme-light .prontusfy-shell main.bg-slate-950, html.theme-light .prontusfy-sidebar, html.theme-light .prontusfy-mobile-nav, html.theme-light .prontusfy-topbar { background-color: #1e222b !important; }
+html.theme-light .prontusfy-shell, html.theme-light .prontusfy-shell main.bg-slate-950 { color: #f9fafb; }
+html.theme-light .prontusfy-topbar .text-white, html.theme-light .prontusfy-shell main.bg-slate-950.text-white { color: #f9fafb !important; }
+html.theme-light .prontusfy-sidebar .text-slate-400, html.theme-light .prontusfy-sidebar .text-slate-500, html.theme-light .prontusfy-mobile-nav .text-slate-500 { color: #cbd5e1 !important; }
+html.theme-light .prontusfy-shell main.bg-slate-950 > .mx-auto > :first-child .text-slate-400 { color: #d1d5db !important; }
+html.theme-light .prontusfy-shell main.bg-slate-950 > .mx-auto > :first-child .text-white { color: #f9fafb !important; }

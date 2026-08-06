@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <AuthProvider initialUser={{ id: user.id, email: user.email }} initialPlan={initialPlan} initialSubscriptionActive={initialSubscriptionActive}>
-      <div className="min-h-screen overflow-x-hidden bg-slate-950 text-white">
+      <div className="prontusfy-shell min-h-screen overflow-x-hidden bg-slate-950 text-white">
         <Sidebar />
         <main className="min-w-0 pb-24 lg:ml-64 lg:pb-0"><PanelTopbar />{children}</main>
       </div>

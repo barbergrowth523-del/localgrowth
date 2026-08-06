@@ -28,7 +28,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden h-screen w-64 flex-col justify-between overflow-y-auto border-r border-slate-800 bg-slate-950 p-2 lg:flex">
+      <aside className="prontusfy-sidebar fixed inset-y-0 left-0 z-40 hidden h-screen w-64 flex-col justify-between overflow-y-auto border-r border-slate-800 bg-slate-950 p-2 lg:flex">
         <div>
           <div className="mb-1 flex flex-col items-center justify-center p-0"><BrandLogo className="w-full" markClassName="h-auto w-full max-w-[180px]" /></div>
 
@@ -66,7 +66,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <nav aria-label="Menu principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-950/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl backdrop-blur-lg lg:hidden">
+      <nav aria-label="Menu principal" className="prontusfy-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t border-slate-800 bg-slate-950/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl backdrop-blur-lg lg:hidden">
         <div className="flex min-w-max gap-1">
           {menuItems.map((item) => {
             const Icon = item.icon
