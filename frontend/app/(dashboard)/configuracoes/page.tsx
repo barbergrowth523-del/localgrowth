@@ -144,7 +144,7 @@ export default function ConfiguracoesPage() {
     setServices((current) => current.filter((item) => item.id !== service.id)); setStatus('Servico apagado com sucesso!')
   }
 
-  return <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
+  return <div data-page="settings" className="mx-auto w-full max-w-5xl px-4 py-6 sm:p-6 md:p-8 lg:p-12">
     <div className="mb-8"><h1 className="flex items-center gap-3 text-3xl font-bold text-white"><Settings className="h-8 w-8 text-emerald-400" /> Configuracoes do Sistema</h1><p className="mt-1 text-sm text-slate-400">Organize dados, agendamentos, marketing e servicos em um so lugar.</p></div>
     {status && <p className={'mb-6 rounded-xl border px-4 py-3 text-sm ' + (status.startsWith('Erro') || status.startsWith('Sua sessao') || status.startsWith('Informe') ? 'border-rose-500/20 bg-rose-500/10 text-rose-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300')}>{status}</p>}
     <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-2" aria-label="Abas de configuracoes">

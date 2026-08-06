@@ -228,7 +228,7 @@ export default function AgendaPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-8 lg:p-12">
+    <main data-page="agenda" className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-8 lg:p-12">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-center">
           <div>
@@ -240,10 +240,10 @@ export default function AgendaPage() {
         </div>
 
         {(status || reminderStatus) && <p className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{status || reminderStatus}</p>}
-        {!services.length && !loading && <p className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">Cadastre seus servicos em Configuracoes antes de criar um agendamento.</p>}
+        {!services.length && !loading && <p data-ui-alert="warning" className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">Cadastre seus servicos em Configuracoes antes de criar um agendamento.</p>}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,1fr)]">
-          <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-2xl sm:p-5">
+          <section data-ui-card="calendar" className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-2xl sm:p-5">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Calendario</p>
@@ -266,7 +266,7 @@ export default function AgendaPage() {
             </div>
           </section>
 
-          <section data-tour="agenda-content" className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+          <section data-tour="agenda-content" data-ui-card="appointments" className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 p-5">
               <div><h2 className="font-semibold text-white">Horarios marcados</h2><p className="mt-1 text-xs text-slate-500">{displayDate(selectedDate)} - {dayAppointments.length ? dayAppointments.length + (dayAppointments.length === 1 ? ' corte' : ' cortes') : 'Disponivel'}</p></div>
               <Clock3 className="h-5 w-5 text-emerald-400" />

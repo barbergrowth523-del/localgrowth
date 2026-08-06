@@ -141,7 +141,7 @@ export default function EquipePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-8 lg:p-12">
+    <main data-page="team" className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:p-6 md:p-8 lg:p-12">
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>

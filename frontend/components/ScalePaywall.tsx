@@ -10,7 +10,7 @@ export function ScalePaywall({ children }: { children: React.ReactNode }) {
   if (permissions.isScale) return <>{children}</>
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    <div className="scale-paywall relative overflow-hidden rounded-2xl">
       <div aria-hidden="true" className="pointer-events-none select-none blur-sm">{children}</div>
       <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-[2px] sm:p-6">
         <div className="w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-slate-950/95 p-5 text-center shadow-2xl shadow-emerald-950/40 sm:p-6">
