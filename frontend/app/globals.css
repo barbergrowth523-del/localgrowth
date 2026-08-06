@@ -13,10 +13,10 @@ html.theme-light { color-scheme: light; }
 html.theme-light body { background: #f8f9fa !important; color: #1f2937; }
 html.theme-light .bg-slate-950 { background-color: #f8f9fa !important; }
 html.theme-light .bg-slate-950\/95, html.theme-light .bg-slate-950\/82, html.theme-light .bg-slate-950\/80, html.theme-light .bg-slate-950\/75, html.theme-light .bg-slate-950\/70, html.theme-light .bg-slate-950\/60, html.theme-light .bg-slate-950\/50, html.theme-light .bg-slate-950\/30 { background-color: rgb(248 249 250 / 0.96) !important; }
-html.theme-light .bg-slate-900 { background-color: #ffffff !important; }
-html.theme-light .bg-slate-900\/95, html.theme-light .bg-slate-900\/80, html.theme-light .bg-slate-900\/70, html.theme-light .bg-slate-900\/60, html.theme-light .bg-slate-900\/50 { background-color: rgb(255 255 255 / 0.96) !important; }
-html.theme-light .bg-slate-800, html.theme-light .bg-slate-700 { background-color: #f3f4f6 !important; }
-html.theme-light .bg-slate-800\/70, html.theme-light .bg-slate-800\/60, html.theme-light .bg-slate-800\/50, html.theme-light .bg-slate-800\/35, html.theme-light .bg-slate-800\/30 { background-color: rgb(243 244 246 / 0.9) !important; }
+html.theme-light .bg-slate-900 { background-color: #e5e7eb !important; }
+html.theme-light .bg-slate-900\/95, html.theme-light .bg-slate-900\/80, html.theme-light .bg-slate-900\/70, html.theme-light .bg-slate-900\/60, html.theme-light .bg-slate-900\/50 { background-color: rgb(229 231 235 / 0.96) !important; }
+html.theme-light .bg-slate-800, html.theme-light .bg-slate-700 { background-color: #d1d5db !important; }
+html.theme-light .bg-slate-800\/70, html.theme-light .bg-slate-800\/60, html.theme-light .bg-slate-800\/50, html.theme-light .bg-slate-800\/35, html.theme-light .bg-slate-800\/30 { background-color: rgb(209 213 219 / 0.9) !important; }
 html.theme-light .border-slate-900, html.theme-light .border-slate-800, html.theme-light .border-slate-700 { border-color: #e5e7eb !important; }
 html.theme-light .divide-slate-800 > :not([hidden]) ~ :not([hidden]), html.theme-light .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: #e5e7eb !important; }
 html.theme-light .text-white, html.theme-light .text-slate-200 { color: #1f2937 !important; }
@@ -30,9 +30,10 @@ html.theme-light .shadow-2xl, html.theme-light .shadow-xl, html.theme-light .sha
 html.theme-light input:not([type='checkbox']):not([type='radio']), html.theme-light select, html.theme-light textarea { background-color: #ffffff; border-color: #e5e7eb; color: #1f2937; }
 html.theme-light table thead { background-color: #f9fafb; }
 
-/* Light Mode silver shell: structural surfaces stay neutral while content cards remain white. */
-html.theme-light body { background: #a7a7a7 !important; }
-html.theme-light .prontusfy-shell, html.theme-light .prontusfy-shell > main, html.theme-light .prontusfy-shell main.bg-slate-950, html.theme-light .prontusfy-sidebar, html.theme-light .prontusfy-mobile-nav, html.theme-light .prontusfy-topbar { background-color: #a7a7a7 !important; }
+/* Light Mode inverted surfaces: white canvas, soft gray panels and graphite text. */
+html.theme-light body { background: #ffffff !important; }
+html.theme-light .prontusfy-shell, html.theme-light .prontusfy-shell > main, html.theme-light .prontusfy-shell main.bg-slate-950 { background-color: #ffffff !important; }
+html.theme-light .prontusfy-sidebar, html.theme-light .prontusfy-mobile-nav, html.theme-light .prontusfy-topbar { background-color: #e5e7eb !important; }
 html.theme-light .prontusfy-shell, html.theme-light .prontusfy-shell main.bg-slate-950 { color: #1f2937; }
 html.theme-light .prontusfy-topbar .text-white, html.theme-light .prontusfy-shell main.bg-slate-950.text-white { color: #1f2937 !important; }
 html.theme-light .prontusfy-sidebar .text-slate-400, html.theme-light .prontusfy-sidebar .text-slate-500, html.theme-light .prontusfy-mobile-nav .text-slate-500 { color: #1f2937 !important; }
