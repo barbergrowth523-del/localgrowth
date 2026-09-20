@@ -1,0 +1,617 @@
+{
+  "name": "WF-07 Social Publisher Master",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "n01",
+      "name": "01 - Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and normalize WF-07 input\nconst input = $input.first().json || {};\n\nif (!input.scheduled_post_id) {\n  throw new Error('MISSING_SCHEDULED_POST_ID');\n}\n\nlet platforms = input.platforms || [];\nif (!Array.isArray(platforms)) platforms = [platforms];\nplatforms = [...new Set(platforms.map(p => String(p).toLowerCase().trim().replace(/^\\s+|\\s+$/g, '')))];\nplatforms = platforms.filter(p => p.length > 0);\n\nconst mediaType = (input.media_type || '').toUpperCase();\nconst supported = ['IMAGE'];\nconst unsupported = !mediaType ? null : !supported.includes(mediaType);\n\nreturn [{ json: {\n  scheduled_post_id: input.scheduled_post_id,\n  title: input.title || null,\n  caption: input.caption || null,\n  media_type: mediaType || null,\n  media_url: input.media_url || null,\n  platforms,\n  attempt: Number(input.attempt || 1) || 1,\n  unsupported_media: unsupported\n}}];"
+      },
+      "id": "n02",
+      "name": "02 - Validate/Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decide routing based on input\nconst data = $input.first().json;\n\n// If no platforms → return empty publication_records immediately\nif (!data.platforms || data.platforms.length === 0) {\n  return [{\n    json: {\n      scheduled_post_id: data.scheduled_post_id,\n      publication_records: [],\n      empty_platforms: true\n    },\n    output: 0\n  }];\n}\n\n// If unsupported media → error record\nif (data.unsupported_media) {\n  return [{\n    json: {\n      scheduled_post_id: data.scheduled_post_id,\n      media_type: data.media_type,\n      attempt: data.attempt,\n      platforms: data.platforms,\n      unsupported_media: true\n    },\n    output: 1\n  }];\n}\n\n// Otherwise → continue to platform branches (output 2)\nreturn [{\n  json: data,\n  output: 2\n}];"
+      },
+      "id": "n03",
+      "name": "03 - Route Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst inData = $input.first().json;\nconst igErr = inData.ig_error || {};\nconst sensitive = ['access_token','refresh_token','client_secret','authorization',\n                   'apikey','api_key','secret','password','token'];\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'instagram',\n    status: igErr.status || 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: igErr.creation_id || null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: igErr.error_code || 'IG_ERROR',\n    error_message: igErr.error_message || igErr.status || 'Instagram operation failed'\n  }],\n  ig_response_sanitized: sanitize(igErr)\n}}];"
+      },
+      "id": "n04",
+      "name": "04 - IG Normalize Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst inData = $input.first().json;\nconst fbErr = inData.fb_error || {};\nconst sensitive = ['access_token','refresh_token','client_secret','authorization',\n                   'apikey','api_key','secret','password','token'];\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'facebook',\n    status: 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: fbErr.error_code || 'FACEBOOK_CONFIGURATION_INCOMPLETE',\n    error_message: fbErr.error_message || 'Facebook publishing failed'\n  }],\n  fb_response_sanitized: sanitize(fbErr)\n}}];"
+      },
+      "id": "n05",
+      "name": "05 - FB Normalize Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inData = $('03 - Route Input').first().json;\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'tiktok',\n    status: 'not_configured',\n    success: false,\n    external_post_id: null,\n    external_publish_id: null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: 'TIKTOK_NOT_CONFIGURED',\n    error_message: 'TikTok publishing is not configured'\n  }]\n}}];"
+      },
+      "id": "n06",
+      "name": "06 - TT Not Configured",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all publication_records from all branches\nconst items = $input.all();\nconst recordsMap = new Map();\n\nfor (const item of items) {\n  const recs = item.json.publication_records;\n  if (Array.isArray(recs)) {\n    for (const r of recs) {\n      if (r && r.platform) {\n        recordsMap.set(r.platform, r);\n      }\n    }\n  }\n}\n\nconst records = Array.from(recordsMap.values());\n\nreturn [{ json: {\n  scheduled_post_id: $('02 - Validate/Normalize Input').first().json.scheduled_post_id,\n  publication_records: records\n}}];"
+      },
+      "id": "n07",
+      "name": "07 - Aggregate Publication Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/me/media",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { image_url: $json.media_url, caption: $json.caption } }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "credentialType": "prontusfyInstagramOAuth2Api"
+      },
+      "id": "n08",
+      "name": "08 - IG Create Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 1
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.instagram.com/' + $json.id + '?fields=status_code,status_message,media_type,permalink,media_url,timestamp' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "credentialType": "prontusfyInstagramOAuth2Api"
+      },
+      "id": "n09",
+      "name": "09 - IG Get Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1180,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// IG Polling decision with bounded retries\nconst MAX_ATTEMPTS = 12;\nconst input = $input.first().json;\nconst attempts = Number(input.ig_poll_attempts || 0) + 1;\n\n// Load the latest IG status\nconst statusResp = $('09 - IG Get Status').first().json;\nconst status = statusResp.status_code || statusResp.status || 'UNKNOWN';\n\nconst result = {\n  ...input,\n  ig_poll_attempts: attempts,\n  ig_creation_id: input.ig_creation_id || $('08 - IG Create Media').first().json.id,\n  ig_status: status,\n  ig_status_message: statusResp.status_message || null,\n  ig_media_type: statusResp.media_type || null,\n  ig_permalink: statusResp.permalink || null,\n  ig_media_url: statusResp.media_url || null,\n  ig_timestamp: statusResp.timestamp || null\n};\n\nlet route;\nif (status === 'FINISHED') {\n  route = 'publish';\n} else if (status === 'ERROR' || status === 'EXPIRED' || status === 'REJECTED') {\n  route = 'error';\n  result.ig_error = {\n    error_code: 'IG_STATUS_' + status,\n    error_message: 'Instagram media status: ' + status + (statusResp.status_message ? ' - ' + statusResp.status_message : ''),\n    creation_id: result.ig_creation_id,\n    status: status\n  };\n} else if (attempts >= MAX_ATTEMPTS) {\n  route = 'error';\n  result.ig_error = {\n    error_code: 'IG_STATUS_TIMEOUT',\n    error_message: 'Instagram media status did not reach FINISHED within ' + MAX_ATTEMPTS + ' polling attempts',\n    creation_id: result.ig_creation_id,\n    status: status\n  };\n} else {\n  route = 'poll_again';\n}\n\nreturn [{ json: result, output: route === 'poll_again' ? 0 : (route === 'publish' ? 1 : 2) }];"
+      },
+      "id": "n10",
+      "name": "10 - IG Poll Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/me/media_publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { creation_id: $json.ig_creation_id } }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "credentialType": "prontusfyInstagramOAuth2Api"
+      },
+      "id": "n11",
+      "name": "11 - IG Publish Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1620,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 1
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.instagram.com/' + $json.id + '?fields=id,permalink,media_type,timestamp' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "credentialType": "prontusfyInstagramOAuth2Api"
+      },
+      "id": "n12",
+      "name": "12 - IG Get Published",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1840,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst pub = $json;\nconst statusResp = $('09 - IG Get Status').first().json;\n\nconst record = {\n  platform: 'instagram',\n  status: 'published',\n  success: true,\n  external_post_id: pub.id || null,\n  external_publish_id: $('10 - IG Poll Decision').first().json.ig_creation_id || null,\n  external_url: pub.permalink || null,\n  attempt: $input.first().json.attempt || 1,\n  error_code: null,\n  error_message: null\n};\n\nif (pub.id) {\n  record.external_post_id = pub.id;\n}\nif (pub.permalink) {\n  record.external_url = pub.permalink;\n}\n\nreturn [{ json: {\n  scheduled_post_id: $('02 - Validate/Normalize Input').first().json.scheduled_post_id,\n  publication_records: [record],\n  ig_response_sanitized: sanitize(pub)\n}}];"
+      },
+      "id": "n13",
+      "name": "13 - IG Finalize Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,permissions{permission},category",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "credentialType": "facebookGraphApiOAuth2Api"
+      },
+      "id": "n14",
+      "name": "14 - FB Audit Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Facebook configuration\nconst auditResp = $('14 - FB Audit Pages').first().json;\nconst input = $('03 - Route Input').first().json;\n\nconst accounts = auditResp.data || [];\nif (!accounts || accounts.length === 0) {\n  return [{ json: {\n    ...input,\n    fb_error: {\n      error_code: 'FACEBOOK_CONFIGURATION_INCOMPLETE',\n      error_message: 'Facebook publisher configuration is incomplete',\n      success: false\n    }\n  }, output: 0}];\n}\n\nconst hasPublishPerm = accounts.some(a =>\n  a.permissions && a.permissions.data &&\n  a.permissions.data.some(p =>\n    p.permission === 'pages_manage_posts' || p.permission === 'publish_pages'\n  )\n);\n\nif (!hasPublishPerm) {\n  return [{ json: {\n    ...input,\n    fb_error: {\n      error_code: 'FACEBOOK_CONFIGURATION_INCOMPLETE',\n      error_message: 'Facebook publisher configuration is incomplete',\n      success: false\n    }\n  }, output: 0}];\n}\n\n// Found a valid page - pass through to publishing\nconst page = accounts[0];\nreturn [{ json: {\n  ...input,\n  fb_page_id: page.id,\n  fb_page_name: page.name,\n  fb_page_category: page.category || null\n}, output: 1}];"
+      },
+      "id": "n15",
+      "name": "15 - FB Validate Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v18.0/' + $json.fb_page_id + '/photos' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { url: $json.media_url, caption: $json.caption } }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "credentialType": "facebookGraphApiOAuth2Api"
+      },
+      "id": "n16",
+      "name": "16 - FB Create Photo Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1400,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst createResp = $json;\nconst input = $('03 - Route Input').first().json;\n\nconst record = {\n  platform: 'facebook',\n  status: createResp.id ? 'published' : 'failed',\n  success: !!createResp.id,\n  external_post_id: createResp.id || null,\n  external_publish_id: null,\n  external_url: null,\n  attempt: input.attempt || 1,\n  error_code: createResp.id ? null : (createResp.error ? 'FACEBOOK_POST_FAILED' : null),\n  error_message: createResp.id ? null : (createResp.error ? String(createResp.error).slice(0, 500) : 'Facebook post creation failed')\n};\n\nif (createResp.error) {\n  record.success = false;\n  record.error_code = 'FACEBOOK_POST_FAILED';\n  record.error_message = String(createResp.error).slice(0, 500);\n}\n\nreturn [{ json: {\n  scheduled_post_id: $('02 - Validate/Normalize Input').first().json.scheduled_post_id,\n  publication_records: [record],\n  fb_response_sanitized: sanitize(createResp)\n}}];"
+      },
+      "id": "n17",
+      "name": "17 - FB Finalize Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('03 - Route Input').first().json;\n\nreturn [{ json: {\n  scheduled_post_id: input.scheduled_post_id,\n  media_type: input.media_type,\n  attempt: input.attempt,\n  platforms: input.platforms,\n  publication_records: [{\n    platform: input.platforms && input.platforms[0] || 'unknown',\n    status: 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: null,\n    external_url: null,\n    attempt: input.attempt || 1,\n    error_code: 'UNSUPPORTED_MEDIA_TYPE',\n    error_message: 'Media type ' + (input.media_type || 'UNKNOWN') +\n      ' is not supported by WF-07. Supported: IMAGE'\n  }]\n}}];"
+      },
+      "id": "n18",
+      "name": "18 - Unsupported Media Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('03 - Route Input').first().json;\n\nreturn [{ json: {\n  scheduled_post_id: input.scheduled_post_id,\n  publication_records: []\n}}];"
+      },
+      "id": "n19",
+      "name": "19 - Empty Platforms Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        60
+      ]
+    }
+  ],
+  "connections": {
+    "01 - Trigger": {
+      "main": [
+        [
+          {
+            "node": "02 - Validate/Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Validate/Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "03 - Route Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Route Input": {
+      "main": [
+        [
+          {
+            "node": "19 - Empty Platforms Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "18 - Unsupported Media Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08 - IG Create Media",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "14 - FB Audit Pages",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "06 - TT Not Configured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 - IG Create Media": {
+      "main": [
+        [
+          {
+            "node": "09 - IG Get Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 - IG Get Status": {
+      "main": [
+        [
+          {
+            "node": "10 - IG Poll Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - IG Poll Decision": {
+      "main": [
+        [
+          {
+            "node": "09 - IG Get Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11 - IG Publish Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04 - IG Normalize Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - IG Publish Media": {
+      "main": [
+        [
+          {
+            "node": "12 - IG Get Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - IG Get Published": {
+      "main": [
+        [
+          {
+            "node": "13 - IG Finalize Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 - IG Finalize Record": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - IG Normalize Error": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 - FB Audit Pages": {
+      "main": [
+        [
+          {
+            "node": "15 - FB Validate Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 - FB Validate Config": {
+      "main": [
+        [
+          {
+            "node": "05 - FB Normalize Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "16 - FB Create Photo Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16 - FB Create Photo Post": {
+      "main": [
+        [
+          {
+            "node": "17 - FB Finalize Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17 - FB Finalize Record": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - FB Normalize Error": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - TT Not Configured": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "18 - Unsupported Media Type": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "19 - Empty Platforms Result": {
+      "main": [
+        [
+          {
+            "node": "07 - Aggregate Publication Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - Aggregate Publication Records": {
+      "main": []
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "id": "2166f5a953b940d5a161825ec2"
+}
