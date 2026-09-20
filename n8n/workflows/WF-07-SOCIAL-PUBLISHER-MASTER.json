@@ -3,19 +3,12 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 1
-            }
-          ]
-        }
+        "inputSource": "acceptAll"
       },
       "id": "n01",
-      "name": "01 - Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "name": "01 - Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
         220,
         300
@@ -36,7 +29,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Decide routing based on input\nconst data = $input.first().json;\n\n// If no platforms → return empty publication_records immediately\nif (!data.platforms || data.platforms.length === 0) {\n  return [{\n    json: {\n      scheduled_post_id: data.scheduled_post_id,\n      publication_records: [],\n      empty_platforms: true\n    },\n    output: 0\n  }];\n}\n\n// If unsupported media → error record\nif (data.unsupported_media) {\n  return [{\n    json: {\n      scheduled_post_id: data.scheduled_post_id,\n      media_type: data.media_type,\n      attempt: data.attempt,\n      platforms: data.platforms,\n      unsupported_media: true\n    },\n    output: 1\n  }];\n}\n\n// Otherwise → continue to platform branches (output 2)\nreturn [{\n  json: data,\n  output: 2\n}];"
+        "jsCode": "// Decide routing based on input\nconst data = $input.first().json;\n\n// If no platforms -> return empty publication_records immediately\nif (!data.platforms || data.platforms.length === 0) {\n  return [{\n    json: {\n      scheduled_post_id: data.scheduled_post_id,\n      publication_records: [],\n      empty_platforms: true\n    },\n    output: 0\n  }];\n}\n\n// If unsupported media -> error record\nif (data.unsupported_media) {\n  return [{\n    json: {\n      scheduled_post_id: data.scheduled_post_id,\n      media_type: data.media_type,\n      attempt: data.attempt,\n      platforms: data.platforms,\n      unsupported_media: true\n    },\n    output: 1\n  }];\n}\n\n// Otherwise -> continue to platform branches (output 2)\nreturn [{\n  json: data,\n  output: 2\n}];"
       },
       "id": "n03",
       "name": "03 - Route Input",
@@ -49,7 +42,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst inData = $input.first().json;\nconst igErr = inData.ig_error || {};\nconst sensitive = ['access_token','refresh_token','client_secret','authorization',\n                   'apikey','api_key','secret','password','token'];\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'instagram',\n    status: igErr.status || 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: igErr.creation_id || null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: igErr.error_code || 'IG_ERROR',\n    error_message: igErr.error_message || igErr.status || 'Instagram operation failed'\n  }],\n  ig_response_sanitized: sanitize(igErr)\n}}];"
+        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst inData = $input.first().json;\nconst igErr = inData.ig_error || {};\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'instagram',\n    status: igErr.status || 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: igErr.creation_id || null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: igErr.error_code || 'IG_ERROR',\n    error_message: igErr.error_message || igErr.status || 'Instagram operation failed'\n  }],\n  ig_response_sanitized: sanitize(igErr)\n}}];"
       },
       "id": "n04",
       "name": "04 - IG Normalize Error",
@@ -62,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst inData = $input.first().json;\nconst fbErr = inData.fb_error || {};\nconst sensitive = ['access_token','refresh_token','client_secret','authorization',\n                   'apikey','api_key','secret','password','token'];\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'facebook',\n    status: 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: fbErr.error_code || 'FACEBOOK_CONFIGURATION_INCOMPLETE',\n    error_message: fbErr.error_message || 'Facebook publishing failed'\n  }],\n  fb_response_sanitized: sanitize(fbErr)\n}}];"
+        "jsCode": "function sanitize(val) {\n  const keys = ['access_token','refresh_token','client_secret','authorization',\n                'apikey','api_key','secret','password','token'];\n  if (Array.isArray(val)) return val.map(sanitize);\n  if (val && typeof val === 'object') {\n    return Object.fromEntries(\n      Object.entries(val).map(([k,v]) => [\n        k,\n        keys.includes(k.toLowerCase()) ? '[REDACTED]' : sanitize(v)\n      ])\n    );\n  }\n  return val;\n}\nconst inData = $input.first().json;\nconst fbErr = inData.fb_error || {};\n\nreturn [{ json: {\n  scheduled_post_id: inData.scheduled_post_id,\n  publication_records: [{\n    platform: 'facebook',\n    status: 'failed',\n    success: false,\n    external_post_id: null,\n    external_publish_id: null,\n    external_url: null,\n    attempt: inData.attempt || 1,\n    error_code: fbErr.error_code || 'FACEBOOK_CONFIGURATION_INCOMPLETE',\n    error_message: fbErr.error_message || 'Facebook publishing failed'\n  }],\n  fb_response_sanitized: sanitize(fbErr)\n}}];"
       },
       "id": "n05",
       "name": "05 - FB Normalize Error",
@@ -112,11 +105,11 @@
             }
           ]
         },
+        "options": {},
+        "authentication": "predefinedCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { image_url: $json.media_url, caption: $json.caption } }}",
-        "options": {},
-        "authentication": "predefinedCredentialType",
         "credentialType": "prontusfyInstagramOAuth2Api"
       },
       "id": "n08",
@@ -128,7 +121,13 @@
         100
       ],
       "retryOnFail": true,
-      "maxTries": 1
+      "maxTries": 1,
+      "credentials": {
+        "prontusfyInstagramOAuth2Api": {
+          "id": "XlLNrJZvAgXI0f0Z",
+          "name": "Prontusfy Instagram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -156,7 +155,13 @@
         100
       ],
       "retryOnFail": true,
-      "maxTries": 1
+      "maxTries": 1,
+      "credentials": {
+        "prontusfyInstagramOAuth2Api": {
+          "id": "XlLNrJZvAgXI0f0Z",
+          "name": "Prontusfy Instagram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -184,11 +189,11 @@
             }
           ]
         },
+        "options": {},
+        "authentication": "predefinedCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { creation_id: $json.ig_creation_id } }}",
-        "options": {},
-        "authentication": "predefinedCredentialType",
         "credentialType": "prontusfyInstagramOAuth2Api"
       },
       "id": "n11",
@@ -200,7 +205,13 @@
         100
       ],
       "retryOnFail": true,
-      "maxTries": 1
+      "maxTries": 1,
+      "credentials": {
+        "prontusfyInstagramOAuth2Api": {
+          "id": "XlLNrJZvAgXI0f0Z",
+          "name": "Prontusfy Instagram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -228,7 +239,13 @@
         100
       ],
       "retryOnFail": true,
-      "maxTries": 1
+      "maxTries": 1,
+      "credentials": {
+        "prontusfyInstagramOAuth2Api": {
+          "id": "XlLNrJZvAgXI0f0Z",
+          "name": "Prontusfy Instagram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -269,7 +286,13 @@
         300
       ],
       "retryOnFail": true,
-      "maxTries": 1
+      "maxTries": 1,
+      "credentials": {
+        "facebookGraphApiOAuth2Api": {
+          "id": "daIBeWSncPpho4m3",
+          "name": "Prontusfy Meta Facebook"
+        }
+      }
     },
     {
       "parameters": {
@@ -297,11 +320,11 @@
             }
           ]
         },
+        "options": {},
+        "authentication": "predefinedCredentialType",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { url: $json.media_url, caption: $json.caption } }}",
-        "options": {},
-        "authentication": "predefinedCredentialType",
         "credentialType": "facebookGraphApiOAuth2Api"
       },
       "id": "n16",
@@ -313,7 +336,13 @@
         300
       ],
       "retryOnFail": true,
-      "maxTries": 1
+      "maxTries": 1,
+      "credentials": {
+        "facebookGraphApiOAuth2Api": {
+          "id": "daIBeWSncPpho4m3",
+          "name": "Prontusfy Meta Facebook"
+        }
+      }
     },
     {
       "parameters": {
@@ -356,7 +385,7 @@
     }
   ],
   "connections": {
-    "01 - Trigger": {
+    "01 - Execute Workflow Trigger": {
       "main": [
         [
           {
@@ -613,5 +642,5 @@
     "templateCredsSetupCompleted": true
   },
   "tags": [],
-  "id": "2166f5a953b940d5a161825ec2"
+  "id": "0cf4e5de9fd64347b510fb059f"
 }
