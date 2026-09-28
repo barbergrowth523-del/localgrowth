@@ -124,6 +124,7 @@
                                                          "waitForSubWorkflow":  true
                                                      }
                                      },
+                      "onError":  "continueRegularOutput",
                       "id":  "publisher-execute",
                       "name":  "06 - Execute WF-07 Social Publisher Master",
                       "type":  "n8n-nodes-base.executeWorkflow",
@@ -135,7 +136,7 @@
                   },
                   {
                       "parameters":  {
-                                         "jsCode":  "function sanitize(value) { const keys = [\u0027access_token\u0027,\u0027refresh_token\u0027,\u0027client_secret\u0027,\u0027authorization\u0027,\u0027apikey\u0027,\u0027api_key\u0027,\u0027secret\u0027,\u0027password\u0027]; if (Array.isArray(value)) return value.map(sanitize); if (value \u0026\u0026 typeof value === \u0027object\u0027) return Object.fromEntries(Object.entries(value).map(([k,v]) =\u003e [k, keys.includes(k.toLowerCase()) ? \u0027[REDACTED]\u0027 : sanitize(v)])); return value; }\nconst original = $(\u002705 - Build WF-07 Input\u0027).first().json;\nconst result = sanitize($json);\nconst records = Array.isArray(result.publication_records) ? result.publication_records : [];\nconst successes = records.filter((r) =\u003e r.success === true || r.status === \u0027published\u0027);\nconst finalStatus = successes.length === records.length \u0026\u0026 records.length \u003e 0 ? \u0027published\u0027 : successes.length \u003e 0 ? \u0027partially_published\u0027 : \u0027failed\u0027;\nreturn [{ json: { scheduled_post_id: original.scheduled_post_id, final_status: finalStatus, published_at: finalStatus === \u0027published\u0027 ? new Date().toISOString() : null, records, response_sanitized: result } }];"
+                                         "jsCode":  "function sanitize(value) { const keys = [\u0027access_token\u0027,\u0027refresh_token\u0027,\u0027client_secret\u0027,\u0027authorization\u0027,\u0027apikey\u0027,\u0027api_key\u0027,\u0027secret\u0027,\u0027password\u0027]; if (Array.isArray(value)) return value.map(sanitize); if (value \u0026\u0026 typeof value === \u0027object\u0027) return Object.fromEntries(Object.entries(value).map(([k,v]) =\u003e [k, keys.includes(k.toLowerCase()) ? \u0027[REDACTED]\u0027 : sanitize(v)])); return value; }\nconst original = $(\u002705 - Build WF-07 Input\u0027).first().json;\nconst result = sanitize($json);\nconst records = Array.isArray(result.publication_records) ? result.publication_records : (result.error ? (original.platforms || []).map((platform) =\u003e ({ platform, status: \u0027failed\u0027, success: false, attempt: original.attempt || 1, error_code: \u0027WF07_EXECUTION_FAILED\u0027, error_message: \u0027Publisher subworkflow failed; check the n8n execution log before retrying.\u0027 })) : []);\nconst successes = records.filter((r) =\u003e r.success === true || r.status === \u0027published\u0027);\nconst finalStatus = successes.length === records.length \u0026\u0026 records.length \u003e 0 ? \u0027published\u0027 : successes.length \u003e 0 ? \u0027partially_published\u0027 : \u0027failed\u0027;\nreturn [{ json: { scheduled_post_id: original.scheduled_post_id, final_status: finalStatus, published_at: finalStatus === \u0027published\u0027 ? new Date().toISOString() : null, records, response_sanitized: result.error ? { error: \u0027WF07_EXECUTION_FAILED\u0027 } : result } }];"
                                      },
                       "id":  "publisher-normalize",
                       "name":  "07 - Normalize Publication Result",
@@ -243,6 +244,8 @@
                         "03 - Loop Posts":  {
                                                 "main":  [
                                                              [
+                                                             ],
+                                                             [
                                                                  {
                                                                      "node":  "04 - Claim Post",
                                                                      "type":  "main",
@@ -297,20 +300,24 @@
                                                               },
                         "08 - Update Scheduled Post":  {
                                                            "main":  [
-                                                                        {
-                                                                            "node":  "09 - Insert Publication Logs",
-                                                                            "type":  "main",
-                                                                            "index":  0
-                                                                        }
+                                                                        [
+                                                                            {
+                                                                                "node":  "09 - Insert Publication Logs",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
                                                                     ]
                                                        },
                         "09 - Insert Publication Logs":  {
                                                              "main":  [
-                                                                          {
-                                                                              "node":  "03 - Loop Posts",
-                                                                              "type":  "main",
-                                                                              "index":  0
-                                                                          }
+                                                                          [
+                                                                              {
+                                                                                  "node":  "03 - Loop Posts",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
                                                                       ]
                                                          }
                     },
