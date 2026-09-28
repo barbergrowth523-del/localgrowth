@@ -254,7 +254,7 @@ async function automation() {
     supabase
       .from("scheduled_posts")
       .select(
-        "media_type,platforms,scheduled_for,status,published_at,retry_count,created_at",
+        "id,media_type,platforms,scheduled_for,status,processing_started_at,updated_at,published_at,retry_count,created_at",
       )
       .limit(1000),
 
@@ -289,6 +289,18 @@ async function automation() {
       total: scheduledTotal,
       by_status: countBy(scheduledResult.data ?? [], "status"),
       by_media_type: countBy(scheduledResult.data ?? [], "media_type"),
+      processing_sample: (scheduledResult.data ?? [])
+        .filter((post) => post.status === "processing")
+        .slice(0, 20)
+        .map((post) => ({
+          id: post.id,
+          media_type: post.media_type,
+          platforms: post.platforms,
+          scheduled_for: post.scheduled_for,
+          processing_started_at: post.processing_started_at,
+          updated_at: post.updated_at,
+          retry_count: post.retry_count,
+        })),
     },
     publications: {
       total: publicationTotal,
@@ -299,6 +311,12 @@ async function automation() {
       total: socialTotal,
       by_status: countBy(socialResult.data ?? [], "status"),
       by_platform: countBy(socialResult.data ?? [], "platform"),
+      by_platform_status: Object.fromEntries(
+        (socialResult.data ?? []).map((account) => [
+          account.platform,
+          account.status,
+        ]),
+      ),
     },
   };
 }
